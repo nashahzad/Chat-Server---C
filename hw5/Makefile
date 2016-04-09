@@ -3,13 +3,13 @@ CFLAGS = -Wall -Werror -g
 all: server client chat
 
 server:
-	gcc $(CFLAGS) -o $@
+	gcc $(CFLAGS) server.c -o $@
 
 client:
-	gcc $(CFLAGS) -o $@
+	gcc $(CFLAGS) client.c -o $@
 
 chat:
-	gcc $(CFLAGS) -o $@
+	gcc $(CFLAGS) chat.c -o $@
 
 clean:
 	rm -f server
