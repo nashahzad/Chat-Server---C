@@ -1,20 +1,7 @@
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <termios.h>
-#include <errno.h>
-#include <ctype.h>
-#include <netinet/in.h>
-#include <pthread.h>
+#include "server.h"
 
-#define _GNU_SOURCE
-#define MAX_INPUT 1024
-#define USAGE "./server [-h|-v] PORT_NUMBER MOTD\n-h            Displays help menu & returns EXIT_SUCCESS.\n-v            Verbose print all incoming and outgoing protocol verbs and content.\nPORT_NUMBER   Port number to listen on.\nMOTD          Message to display to the client when they connect.\n"
+static char * users[50] = {0};
+static int userCounter = 0;
 
 void * handleClient(void * param) {
   int * parameter = (int *) param;
@@ -26,6 +13,7 @@ void * handleClient(void * param) {
     inputCounter += recvData;
     write(client, input, strlen(input));
   }
+  users[userCounter++] = input;
   return NULL;
 }
 
@@ -108,7 +96,6 @@ int main(int argc, char *argv[]) {
         if (counter == serverSocket) {
           //accept an incoming connection
           unsigned int clientLength;
-          write(1, "test\n", 5);
           int clientSocket = accept(serverSocket, (struct sockaddr *) &clientInfo, &clientLength);
           if (clientSocket == -1) {
             printf("Accept error.\n");
@@ -127,11 +114,15 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
           }
           else if (strncmp("/users\n", test, 7) == 0) {
-            printf("/users test");
+            printf("/users test\n");
             fflush(stdout);
+            int count = 0;
+            for(; count < userCounter; count++) {
+              printf("%s\n", users[count]);
+            }
           }
           else if (strncmp("/shutdown\n", test, 10) == 0) {
-            printf("/shutdown test");
+            printf("/shutdown test\n");
             fflush(stdout);
           }
           else {
