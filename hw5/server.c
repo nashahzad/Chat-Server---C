@@ -86,6 +86,7 @@ int main(int argc, char *argv[]) {
       printf("Accept error.\n");
       continue;
     }
+    printf("hello!");
     write(clientSocket, message, strlen(message));
     //create thread
     pthread_t tid;
