@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Werror -g
+CFLAGS = -Wall -Werror -g -pthread
 
 all: server client chat
 
@@ -12,6 +12,4 @@ chat:
 	gcc $(CFLAGS) chat.c -o $@
 
 clean:
-	rm -f server
-	rm -f client
-	rm -f chat
+	rm -f server client chat
