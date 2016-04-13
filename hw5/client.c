@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
   //enter server's info
   struct sockaddr_in serverInfo;
   memset(&serverInfo, 0, sizeof(serverInfo));
-  serverInfo.sin_family = AF_INET;
+  serverInfo.sin_family = AF_INET; //AF_INET IPv4 Protocol
   serverInfo.sin_addr.s_addr = inet_addr(serverIP);
   serverInfo.sin_port = htons(serverPort);
   //then try to connect
@@ -61,7 +61,20 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
   printf("%li", send(clientSocket, name, strlen(name), 0));
-  char reply[MAX_INPUT] = {0};
-  recv(clientSocket, reply, MAX_INPUT, 0);
-  write(1, reply, strlen(reply));
+
+  //SET UP I/O MULTIPLEXING
+  int poll = epoll_create(1);
+  struct epoll_event *event = malloc(sizeof(event));
+  epoll_ctl(poll, EPOLL_CTL_ADD, 0, event);
+  epoll_ctl(poll, EPOLL_CTL_ADD, clientSocket, event);
+
+  //BLOCK UNTIL THERE IS SOMETHING TO ACTUALLY READ FROM STDIN OR SERVER
+  while(1){
+    if(epoll_wait(poll, event, 1, 5000) != -1){
+      char reply[MAX_INPUT] = {0};
+      recv(clientSocket, reply, MAX_INPUT, 0);
+      write(1, reply, strlen(reply));
+    }
+  }
+  
 }

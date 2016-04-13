@@ -18,6 +18,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <sys/epoll.h>
+
 
 
 #define MAX_INPUT 1024
