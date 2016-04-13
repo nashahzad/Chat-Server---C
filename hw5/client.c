@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
   }
   //enter server's info
   struct sockaddr_in serverInfo;
+  memset(&serverInfo, 0, sizeof(serverInfo));
   serverInfo.sin_family = AF_INET;
   serverInfo.sin_addr.s_addr = inet_addr(serverIP);
   serverInfo.sin_port = htons(serverPort);
@@ -77,5 +78,8 @@ int main(int argc, char *argv[]) {
     printf("Connect failed.\n");
     exit(EXIT_FAILURE);
   }
-  write(clientSocket, "Hello!\n", 7);
+  printf("%li", send(clientSocket, name, strlen(name), 0));
+  char reply[MAX_INPUT] = {0};
+  recv(clientSocket, reply, MAX_INPUT, 0);
+  write(1, reply, strlen(reply));
 }

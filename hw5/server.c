@@ -16,10 +16,16 @@
 #define MAX_INPUT 1024
 #define USAGE "./server [-h|-v] PORT_NUMBER MOTD\n-h            Displays help menu & returns EXIT_SUCCESS.\n-v            Verbose print all incoming and outgoing protocol verbs and content.\nPORT_NUMBER   Port number to listen on.\nMOTD          Message to display to the client when they connect.\n"
 
-void * writeToClient(void * param) {
+void * handleClient(void * param) {
   int * parameter = (int *) param;
-  int clientSocket = *parameter;
-  write(clientSocket, "Hello!\n", 7);
+  int client = *parameter;
+  //set up holding area for data
+  char input[MAX_INPUT] = {0};
+  int recvData, inputCounter = 0;
+  while ((recvData = recv(client, &input[inputCounter], MAX_INPUT, 0)) > 0) {
+    inputCounter += recvData;
+    write(client, input, strlen(input));
+  }
   return NULL;
 }
 
@@ -68,9 +74,11 @@ int main(int argc, char *argv[]) {
   }
   //then bind it to a port
   struct sockaddr_in serverInfo, clientInfo;
+  memset(&serverInfo, 0, sizeof(serverInfo));
+  memset(&clientInfo, 0, sizeof(clientInfo));
   serverInfo.sin_family = AF_INET;
   serverInfo.sin_port = htons(portNumber);
-  serverInfo.sin_addr.s_addr = INADDR_ANY;
+  serverInfo.sin_addr.s_addr = htonl(INADDR_ANY);
   if (bind(serverSocket, (struct sockaddr *) &serverInfo, sizeof(serverInfo)) == -1) {
     printf("Failed to bind to port %d\n", portNumber);
     exit(EXIT_FAILURE);
@@ -81,15 +89,17 @@ int main(int argc, char *argv[]) {
   while(1) {
     //accept an incoming connection
     unsigned int clientLength;
+    write(1, "test\n", 5);
     int clientSocket = accept(serverSocket, (struct sockaddr *) &clientInfo, &clientLength);
     if (clientSocket == -1) {
       printf("Accept error.\n");
       continue;
     }
-    printf("hello!");
-    write(clientSocket, message, strlen(message));
     //create thread
     pthread_t tid;
-    pthread_create(&tid, NULL, (void *) &writeToClient, (void *) &clientSocket);
+    pthread_create(&tid, NULL, (void *) &handleClient, (void *) &clientSocket);
+
+    //write(clientSocket, message, strlen(message));
+
   }
 }
