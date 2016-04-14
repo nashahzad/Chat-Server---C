@@ -4,68 +4,6 @@ static char * users[50] = {0};
 static int userCounter = 0;
 static char motd[MAX_INPUT] = {0};
 
-//check if a received message has the correct EOM. returns either 0 or 1
-int checkEOM(char * start) {
-  int size;
-  int counter;
-  if ((size = strlen(start)) < 4)
-    return 0;
-  for (counter = 0; counter < size; counter++) {
-    if ((start[counter] == '\r') && ((size - counter) >= 4)) {
-      char check[4] = {0};
-      strncpy(check, start + counter, 4);
-      if (strcmp(check, "\r\n\r\n") == 0) {
-        memset(start + counter, 0, MAX_INPUT - counter - 1);
-        return 1;
-      }
-    }
-  }
-  return 0;
-}
-
-//handle login
-void * handleClient(void * param) {
-  int client = *((int *) param);
-  //set up holding area for data
-  char input[MAX_INPUT] = {0};
-  int recvData;
-  recvData = recv(client, input, MAX_INPUT, 0);
-  //check if client started login protocol correctly
-  if (recvData > 0) {
-    if (strcmp(input, "WOLFIE\r\n\r\n") == 0) {
-      send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
-    }
-  }
-  memset(input, 0, MAX_INPUT - 1);
-  recvData = recv(client, input, MAX_INPUT, 0);
-  if (recvData > 0) {
-    char check1[5] = {0};
-    char check2[5] = {0};
-    char name[100] = {0};
-    //check if the message is IAM <name> \r\n\r\n
-    if (checkEOM(input)) {
-      int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
-      if ((strcmp(check1, "IAM") == 0) /*&& strcmp(check2, "\r\n\r\n") */&& (checkWolfieProtocol == 2)) {
-        char hiResponse[200] = {0};
-        sprintf(hiResponse, "%s", "HI ");
-        strcat(hiResponse, name);
-        strcat(hiResponse, " \r\n\r\n");
-        send(client, hiResponse, strlen(hiResponse), 0);
-        //add user to list
-        users[userCounter++] = input;
-        //and send MOTD
-        send(client, motd, strlen(motd), 0);
-      }
-    }
-  }
-  return NULL;
-}
-
-//handle communication (after a login)
-void * handleClient2(void * param) {
-  return NULL;
-}
-
 int main(int argc, char *argv[]) {
   int verboseFlag = 0;
   //first check the # of arg's to see if any flags were given
@@ -190,4 +128,70 @@ int main(int argc, char *argv[]) {
       }
     }
   }
+}
+
+//check if a received message has the correct EOM. returns either 0 or 1
+int checkEOM(char * start) {
+  int size;
+  int counter;
+  if ((size = strlen(start)) < 4)
+    return 0;
+  for (counter = 0; counter < size; counter++) {
+    if ((start[counter] == '\r') && ((size - counter) >= 4)) {
+      char check[4] = {0};
+      strncpy(check, start + counter, 4);
+      if (strcmp(check, "\r\n\r\n") == 0) {
+        memset(start + counter, 0, MAX_INPUT - counter - 1);
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+//handle login
+void * handleClient(void * param) {
+  int client = *((int *) param);
+  //set up holding area for data
+  char input[MAX_INPUT] = {0};
+  int recvData;
+  recvData = recv(client, input, MAX_INPUT, 0);
+  //check if client started login protocol correctly
+  if (recvData > 0) {
+    if (strcmp(input, "WOLFIE\r\n\r\n") == 0) {
+      send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
+    }
+  }
+  memset(input, 0, MAX_INPUT - 1);
+  recvData = recv(client, input, MAX_INPUT, 0);
+  if (recvData > 0) {
+    char check1[5] = {0};
+    char check2[5] = {0};
+    char name[100] = {0};
+    //check if the message is IAM <name> \r\n\r\n
+    if (checkEOM(input)) {
+      int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
+      if ((strcmp(check1, "IAM") == 0) /*&& strcmp(check2, "\r\n\r\n") */&& (checkWolfieProtocol == 2)) {
+        char hiResponse[200] = {0};
+        sprintf(hiResponse, "%s", "HI ");
+        strcat(hiResponse, name);
+        strcat(hiResponse, " \r\n\r\n");
+        send(client, hiResponse, strlen(hiResponse), 0);
+        //add user to list
+        users[userCounter++] = input;
+        //and send MOTD
+        char sendMOTD[200] = {0};
+        strcpy(sendMOTD, "MOTD ");
+        strcat(sendMOTD, motd);
+        strcat(sendMOTD, " \r\n\r\n");
+        send(client, sendMOTD, strlen(sendMOTD), 0);
+      }
+    }
+  }
+  return NULL;
+}
+
+//handle communication (after a login)
+void * handleClient2(void * param) {
+  return NULL;
 }
