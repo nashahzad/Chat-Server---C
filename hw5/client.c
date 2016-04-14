@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
         strcat(login, name);
 
         //SECOND PART TO LOGIN PROCEDURE SERVER SAYS HI
-        if(strcmp(buffer, name) == 0){
+        if(strcmp(buffer, login) == 0){
           fprintf(stdout, "%s\n", buffer);
         }
 
@@ -157,6 +157,33 @@ int main(int argc, char *argv[]) {
     }
   }
 
+}
+
+bool checkProtocol(){
+  int size;
+  if((size = strlen(buffer)) < 4){
+    fprintf(stderr, "%s\n", "Bad packet sent from server!");
+    return false;
+  }
+
+  for(int i = 0; i < size; i++){
+    if(buffer[i] == '\r' && (size - i - 1) >= 4){
+      char *check = malloc(4);
+      memset(check, 0, 4);
+      strncpy(check, buffer + i, 4);
+
+      if(strcmp(check, "\r\n\r\n") == 0){
+        //IF IT GETS HERE THEN PACKET FOLLOWED PROTOCOL
+        //JUST MEMSET PROTOCOL AND EVERYTHING PAST IT WITH 0
+        memset(buffer + i, 0, MAX_INPUT - i);
+        return true;
+      }
+    }
+  }
+
+  //REACHES HERE, THEN WENT THROUGH LOOP WITHOUT EVER FINDING PROTOCOL
+  fprintf(stderr, "%s\n", "Bad packet from server, didn't follow protocl!");
+  return false;
 }
 
 void removeNewline(char *string, int length){

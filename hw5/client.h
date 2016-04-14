@@ -36,6 +36,8 @@ bool verboseFlag = false;
 
 char buffer[MAX_INPUT];
 
+bool checkProtocol();
+
 
 
 void removeNewline(char *string, int length);
