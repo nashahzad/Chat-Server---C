@@ -2,18 +2,52 @@
 
 static char * users[50] = {0};
 static int userCounter = 0;
+static char motd[MAX_INPUT] = {0};
 
+//handle login
 void * handleClient(void * param) {
   int * parameter = (int *) param;
   int client = *parameter;
   //set up holding area for data
   char input[MAX_INPUT] = {0};
-  int recvData, inputCounter = 0;
-  while ((recvData = recv(client, &input[inputCounter], MAX_INPUT, 0)) > 0) {
-    inputCounter += recvData;
-    write(client, input, strlen(input));
+  int recvData;
+  recvData = recv(client, input, MAX_INPUT, 0);
+  //check if client started login protocol correctly
+  if (recvData > 0) {
+    if (strcmp(input, "WOLFIE\r\n\r\n") == 0) {
+      send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
+    }
   }
-  users[userCounter++] = input;
+  write(1, input, strlen(input));
+  memset(input, 0, MAX_INPUT - 1);
+  recvData = recv(client, input, MAX_INPUT, 0);
+  write(1, "abc", 3);
+  printf("%lu", strlen(input));
+  fflush(stdout);
+  if (recvData > 0) {
+    char check1[5] = {0};
+    char check2[5] = {0};
+    char name[100] = {0};
+    write(1, input, strlen(input));
+    //check if the message is IAM <name> \r\n\r\n
+    int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
+    if ((strcmp(check1, "IAM") == 0) && strcmp(check2, "\r\n\r\n") && (checkWolfieProtocol == 3)) {
+      char hiResponse[200] = {0};
+      sprintf(hiResponse, "%s", "HI ");
+      strcat(hiResponse, name);
+      strcat(hiResponse, " \r\n\r\n");
+      send(client, hiResponse, strlen(hiResponse), 0);
+      //add user to list
+      users[userCounter++] = input;
+      //and send MOTD
+      send(client, motd, strlen(motd), 0);
+    }
+  }
+  return NULL;
+}
+
+//handle communication (after a login)
+void * handleClient2(void * param) {
   return NULL;
 }
 
@@ -22,7 +56,7 @@ int main(int argc, char *argv[]) {
   //first check the # of arg's to see if any flags were given
   int opt;
   int portNumber;
-  char message[MAX_INPUT] = {0};
+  //char message[MAX_INPUT] = {0};
   //char * users[50] = {0};
   if ((argc == 4) || (argc == 5)) {
     while((opt = getopt(argc, argv, "hv")) != -1) {
@@ -43,7 +77,7 @@ int main(int argc, char *argv[]) {
       }
     }
     portNumber = atoi(argv[optind]);
-    strcpy(message, argv[optind + 1]);
+    strcpy(motd, argv[optind + 1]);
   }
   else if (argc != 3) {
     printf(USAGE);
@@ -52,7 +86,7 @@ int main(int argc, char *argv[]) {
   //now it is definitely known that argc is 3 here. the verbose flag (if found, is set)
   else {
     portNumber = atoi(argv[1]);
-    strcpy(message, argv[2]);
+    strcpy(motd, argv[2]);
   }
 
   //create socket
@@ -74,7 +108,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  //create the fd_set to monitor multiple file descriptors, including stdin to look for server commands
+  //create the fd_set to monitor multiple file descriptors (sockets), including stdin to look for server commands
   fd_set activeFdSet, readFdSet;
   FD_ZERO(&activeFdSet);
   FD_SET(serverSocket, &activeFdSet);
@@ -84,12 +118,13 @@ int main(int argc, char *argv[]) {
   listen(serverSocket, 20); //arbitrary queue length
   printf("Currently listening on port %d\n", portNumber);
   int counter;
+  //run forever until receive /shutdown
   while(1) {
     write(1, ">", 1);
     readFdSet = activeFdSet;
     if (select(FD_SETSIZE, &readFdSet, NULL, NULL, NULL) == -1) {
-      //something bad happened to select
-
+      printf("Select failed.\n");
+      exit(EXIT_FAILURE);
     }
     for(counter = 0; counter < FD_SETSIZE; ++counter) {
       if (FD_ISSET(counter, &readFdSet)) {
@@ -99,11 +134,13 @@ int main(int argc, char *argv[]) {
           int clientSocket = accept(serverSocket, (struct sockaddr *) &clientInfo, &clientLength);
           if (clientSocket == -1) {
             printf("Accept error.\n");
-            continue;
+            fflush(stdout);
           }
-          //create thread
-          pthread_t tid;
-          pthread_create(&tid, NULL, (void *) &handleClient, (void *) &clientSocket);
+          else {
+            //login thread
+            pthread_t tid;
+            pthread_create(&tid, NULL, (void *) &handleClient, (void *) &clientSocket);
+          }
         }
         //is there something on stdin for the server?
         else if (counter == 0) {
@@ -132,8 +169,7 @@ int main(int argc, char *argv[]) {
           }
         }
         else {
-          close(counter);
-          FD_CLR(counter, &activeFdSet);
+
         }
       }
     }

@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
       if(event->data.fd == 0){
         read(0, buffer, MAX_INPUT);
         removeNewline(buffer, MAX_INPUT);
-        
+
         if(strcmp("/help", buffer) == 0){
           fprintf(stdout, HELP);
         }
@@ -92,8 +92,10 @@ int main(int argc, char *argv[]) {
 
       //Received Input from Server
       else{
+        write(1, "abc", 3);
         recv(clientSocket, buffer, MAX_INPUT, 0);
-
+        write(1, "def", 3);
+        write(1, buffer, strlen(buffer));
         //PART OF LOGIN PROCEDURE SEND BACK TO SERVER IAM <NAME>\r\n\r\n
         if(strcmp(buffer, "EIFLOW\r\n\r\n") == 0){
           char *message = malloc(9 + strlen(name));
@@ -125,10 +127,10 @@ int main(int argc, char *argv[]) {
         free(login);
         memset(buffer, 0, MAX_INPUT);
       }
-      
+
     }
   }
-  
+
 }
 
 void removeNewline(char *string, int length){
