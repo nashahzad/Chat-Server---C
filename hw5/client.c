@@ -83,6 +83,10 @@ int main(int argc, char *argv[]) {
         read(0, buffer, MAX_INPUT);
         removeNewline(buffer, MAX_INPUT);
 
+        if(verboseFlag){
+          fprintf(stderr, "received from stdin: %s\n", buffer);
+        }
+
         if(strcmp("/help", buffer) == 0){
           fprintf(stdout, HELP);
         }
@@ -92,10 +96,12 @@ int main(int argc, char *argv[]) {
 
       //Received Input from Server
       else{
-        write(1, "abc", 3);
         recv(clientSocket, buffer, MAX_INPUT, 0);
-        write(1, "def", 3);
         write(1, buffer, strlen(buffer));
+
+        if(verboseFlag){
+          fprintf(stderr, "received from server: %s\n", buffer);
+        }
         //PART OF LOGIN PROCEDURE SEND BACK TO SERVER IAM <NAME>\r\n\r\n
         if(strcmp(buffer, "EIFLOW\r\n\r\n") == 0){
           char *message = malloc(9 + strlen(name));
@@ -104,6 +110,10 @@ int main(int argc, char *argv[]) {
           strcat(message, name);
           strcat(message, " \r\n\r\n");
           send(clientSocket, message, strlen(message), 0);
+
+          if(verboseFlag){
+            fprintf(stderr, "sending to server: %s\n", message);
+          }
           free(message);
         }
 
