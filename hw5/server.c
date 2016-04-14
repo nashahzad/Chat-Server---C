@@ -6,8 +6,7 @@ static char motd[MAX_INPUT] = {0};
 
 //handle login
 void * handleClient(void * param) {
-  int * parameter = (int *) param;
-  int client = *parameter;
+  int client = *((int *) param);
   //set up holding area for data
   char input[MAX_INPUT] = {0};
   int recvData;
@@ -21,7 +20,7 @@ void * handleClient(void * param) {
   write(1, input, strlen(input));
   memset(input, 0, MAX_INPUT - 1);
   recvData = recv(client, input, MAX_INPUT, 0);
-  write(1, "abc", 3);
+  //write(1, "abc", 3);
   printf("%lu", strlen(input));
   fflush(stdout);
   if (recvData > 0) {
@@ -139,7 +138,7 @@ int main(int argc, char *argv[]) {
           else {
             //login thread
             pthread_t tid;
-            pthread_create(&tid, NULL, (void *) &handleClient, (void *) &clientSocket);
+            pthread_create(&tid, NULL, handleClient, &clientSocket);
           }
         }
         //is there something on stdin for the server?

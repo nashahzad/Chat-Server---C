@@ -70,16 +70,26 @@ int main(int argc, char *argv[]) {
 
   //SET UP I/O MULTIPLEXING
   int poll = epoll_create(1);
-  struct epoll_event *event = malloc(sizeof(event));
-  epoll_ctl(poll, EPOLL_CTL_ADD, 0, event);
-  epoll_ctl(poll, EPOLL_CTL_ADD, clientSocket, event);
+  struct epoll_event socketEvent, stdinEvent;
+  struct epoll_event *events;
+
+  socketEvent.data.fd = clientSocket;
+  socketEvent.events = EPOLLIN | EPOLLET;
+  epoll_ctl(poll, EPOLL_CTL_ADD, clientSocket, &socketEvent);
+
+  stdinEvent.data.fd = 0;
+  stdinEvent.events = EPOLLIN | EPOLLET;
+  epoll_ctl(poll, EPOLL_CTL_ADD, 0, &stdinEvent);
+
+  events = calloc(2, sizeof(socketEvent));
+  
 
   //BLOCK UNTIL THERE IS SOMETHING TO ACTUALLY READ FROM STDIN OR SERVER
   while(1){
-    if(epoll_wait(poll, event, 1, 500) != -1){
+    if(epoll_wait(poll, events, 1, 500) != -1){
 
       //SOMETHING WAS WRITTEN IN ON STDIN
-      if(event->data.fd == 0){
+      if(events[1].events == 1){
         read(0, buffer, MAX_INPUT);
         removeNewline(buffer, MAX_INPUT);
 
@@ -98,6 +108,12 @@ int main(int argc, char *argv[]) {
       else{
         recv(clientSocket, buffer, MAX_INPUT, 0);
         write(1, buffer, strlen(buffer));
+
+        if(strlen(buffer) == 1){
+          if(buffer[0] == '\n'){
+            memset(buffer, 0, 1);
+          }
+        }
 
         if(verboseFlag){
           fprintf(stderr, "received from server: %s\n", buffer);
