@@ -4,6 +4,25 @@ static char * users[50] = {0};
 static int userCounter = 0;
 static char motd[MAX_INPUT] = {0};
 
+//check if a received message has the correct EOM. returns either 0 or 1
+int checkEOM(char * start) {
+  int size;
+  int counter;
+  if ((size = strlen(start)) < 4)
+    return 0;
+  for (counter = 0; counter < size; counter++) {
+    if ((start[counter] == '\r') && ((size - counter) >= 4)) {
+      char check[4] = {0};
+      strncpy(check, start + counter, 4);
+      if (strcmp(check, "\r\n\r\n") == 0) {
+        memset(start + counter, 0, MAX_INPUT - counter - 1);
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
 //handle login
 void * handleClient(void * param) {
   int client = *((int *) param);
@@ -17,29 +36,26 @@ void * handleClient(void * param) {
       send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
     }
   }
-  write(1, input, strlen(input));
   memset(input, 0, MAX_INPUT - 1);
   recvData = recv(client, input, MAX_INPUT, 0);
-  //write(1, "abc", 3);
-  printf("%lu", strlen(input));
-  fflush(stdout);
   if (recvData > 0) {
     char check1[5] = {0};
     char check2[5] = {0};
     char name[100] = {0};
-    write(1, input, strlen(input));
     //check if the message is IAM <name> \r\n\r\n
-    int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
-    if ((strcmp(check1, "IAM") == 0) && strcmp(check2, "\r\n\r\n") && (checkWolfieProtocol == 3)) {
-      char hiResponse[200] = {0};
-      sprintf(hiResponse, "%s", "HI ");
-      strcat(hiResponse, name);
-      strcat(hiResponse, " \r\n\r\n");
-      send(client, hiResponse, strlen(hiResponse), 0);
-      //add user to list
-      users[userCounter++] = input;
-      //and send MOTD
-      send(client, motd, strlen(motd), 0);
+    if (checkEOM(input)) {
+      int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
+      if ((strcmp(check1, "IAM") == 0) /*&& strcmp(check2, "\r\n\r\n") */&& (checkWolfieProtocol == 2)) {
+        char hiResponse[200] = {0};
+        sprintf(hiResponse, "%s", "HI ");
+        strcat(hiResponse, name);
+        strcat(hiResponse, " \r\n\r\n");
+        send(client, hiResponse, strlen(hiResponse), 0);
+        //add user to list
+        users[userCounter++] = input;
+        //and send MOTD
+        send(client, motd, strlen(motd), 0);
+      }
     }
   }
   return NULL;
@@ -167,6 +183,7 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
           }
         }
+        //????
         else {
 
         }
