@@ -133,30 +133,35 @@ int main(int argc, char *argv[]) {
           free(message);
         }
 
-        strtok(buffer, "\r\n\r\n");
-
-        char *login = malloc(3 + strlen(name));
-        memset(login, 0, 3 + strlen(name));
-        strcat(login, "HI ");
-        strcat(login, name);
-
-        //SECOND PART TO LOGIN PROCEDURE SERVER SAYS HI
-        if(strcmp(buffer, login) == 0){
-          fprintf(stdout, "%s\n", buffer);
-        }
-
-        //NOT PART OF LOGIN PROCESS
         else{
-          fprintf(stdout, "%s\n", buffer);
-        }
+          if(!checkProtocol()){
+            fprintf(stderr, "\nBAD PACKET: %s\n", buffer);
+          }
 
-        free(login);
-        memset(buffer, 0, MAX_INPUT);
+          else{
+            char *login = malloc(3 + strlen(name));
+            memset(login, 0, 3 + strlen(name));
+            strcat(login, "HI ");
+            strcat(login, name);
+
+            //SECOND PART TO LOGIN PROCEDURE SERVER SAYS HI
+            if(strcmp(buffer, login) == 0){
+              fprintf(stdout, "%s\n", buffer);
+            }
+
+            //NOT PART OF LOGIN PROCESS
+            else{
+              fprintf(stdout, "%s\n", buffer);
+            }
+
+            free(login);
+          }  
+        } 
+        //JUST TO MAKE SURE TO THAT BUFFER GETS SET BACK TO ALL NULL TERMINATORS
+        memset(buffer, 0, MAX_INPUT);     
       }
-
     }
   }
-
 }
 
 bool checkProtocol(){
@@ -182,7 +187,7 @@ bool checkProtocol(){
   }
 
   //REACHES HERE, THEN WENT THROUGH LOOP WITHOUT EVER FINDING PROTOCOL
-  fprintf(stderr, "%s\n", "Bad packet from server, didn't follow protocl!");
+  fprintf(stderr, "%s\n", "Bad packet from server, didn't follow protocol!");
   return false;
 }
 
