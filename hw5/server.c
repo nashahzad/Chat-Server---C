@@ -107,10 +107,6 @@ int main(int argc, char *argv[]) {
             pthread_t tid;
             pthread_create(&tid, NULL, handleClient, &clientSocket);
           }
-          if ((!cThread) && (list_head != NULL)) {
-            pthread_t cid;
-            pthread_create(&cid, NULL, communicationThread, &cThread);
-          }
         }
         //is there something on stdin for the server?
         else if (counter == 0) {
@@ -255,6 +251,11 @@ void * handleClient(void * param) {
             currentlyConnected->next = NULL;
             iterator->next = currentlyConnected;
           }
+          //then run the communication thread
+          if ((!cThread) && (list_head != NULL)) {
+            pthread_t cid;
+            pthread_create(&cid, NULL, communicationThread, &cThread);
+          }
         }
         //name already taken, send a different packet
         else {
@@ -282,6 +283,7 @@ void * communicationThread(void * param) {
     clientList = zeroedList;
     while (iterator != NULL) {
       FD_SET(iterator->socket, &clientList);
+      iterator = iterator->next;
     }
     if (select(FD_SETSIZE, &clientList, NULL, NULL, NULL) == -1) {
       printf("Select failed.\n");
@@ -291,18 +293,57 @@ void * communicationThread(void * param) {
       if (FD_ISSET(c, &clientList)) {
         iterator = list_head;
         while (iterator != NULL) {
+          //is this socket the one with input?
           if (iterator->socket == c) {
             char input[MAX_INPUT] = {0};
             //since already connected, just listen for communication
             int data = recv(c, input, MAX_INPUT, 0);
             if (data > 0) {
               if (checkEOM(input)) {
+                //was the response a /logout?
                 if (strcmp(input, "BYE") == 0) {
-                  close(c);
+                  //need to remove the socket from the list and free up the memory it took up....but where is the user on the list?
+                  //only one element in the list
+                  if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                    list_head = NULL;
+                    free(iterator->username);
+                    free(iterator);
+                    close(c);
+                    *((int *) param) = 0;
+                    //if there's no user, then end the thread
+                    return NULL;
+                  }
+                  //if at beginning
+                  if (iterator->prev == NULL) {
+                    iterator->next->prev = NULL;
+                    list_head = iterator->next;
+                    free(iterator->username);
+                    free(iterator);
+                    close(c);
+                  }
+                  //if at end
+                  else if (iterator->next == NULL) {
+                    iterator->prev->next = NULL;
+                    free(iterator->username);
+                    free(iterator);
+                    close(c);
+                  }
+                  //if in between
+                  else {
+                    iterator->prev->next = iterator->next;
+                    iterator->next->prev = iterator->prev;
+                    free(iterator->username);
+                    free(iterator);
+                    close(c);
+                  }
                   write(1, "here", 4);
                 }
               }
             }
+          }
+          //if it doesn't, go to the next one in the list
+          else {
+            iterator = iterator->next;
           }
         }
       }
