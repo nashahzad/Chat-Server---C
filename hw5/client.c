@@ -205,6 +205,11 @@ int main(int argc, char *argv[]) {
           send(clientSocket, message, strlen(message), 0);
         }
 
+        if(strcmp("/listu", buffer) == 0){
+          char *message = "LISTU\r\n\r\n\0";
+          send(clientSocket, message, strlen(message), 0);
+        }
+
         memset(buffer, 0, MAX_INPUT);
       }     
       
