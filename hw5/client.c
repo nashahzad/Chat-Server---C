@@ -134,6 +134,19 @@ int main(int argc, char *argv[]) {
             //NOT PART OF LOGIN PROCESS
             else{
               fprintf(stdout, "%s\n", buffer);
+
+              //CHECK TO SEE IF SERVER SAID THAT USER NAME WAS ALREADY TAKEN
+              char *error = malloc(strlen("ERR 00 USER NAME TAKEN "));
+              memset(error, 0, strlen("ERR 00 USER NAME TAKEN "));
+              strcat(error, "ERR 00 USER NAME TAKEN ");
+              if(strcmp(buffer, error) == 0){
+                fprintf(stderr, "%s\n", "Due to this error will now be closing the client.");
+                close(clientSocket);
+                free(error);
+                exit(EXIT_FAILURE);
+              }
+              free(error);
+
             }
 
             free(login);
@@ -155,6 +168,13 @@ int main(int argc, char *argv[]) {
 
         if(strcmp("/help", buffer) == 0){
           fprintf(stdout, HELP);
+        }
+
+        if(strcmp("/logout", buffer) == 0){
+          char *message = "BYE\r\n\r\n\0";
+          send(clientSocket, message, strlen(message), 0);
+          close(clientSocket);
+          exit(EXIT_SUCCESS);
         }
 
         memset(buffer, 0, MAX_INPUT);
