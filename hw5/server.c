@@ -129,6 +129,16 @@ int main(int argc, char *argv[]) {
           else if (strncmp("/shutdown\n", test, 10) == 0) {
             printf("/shutdown test\n");
             fflush(stdout);
+            connected_user * iterator = list_head;
+            while (iterator != NULL) {
+              connected_user * temp = iterator;
+              iterator = iterator->next;
+              send(temp->socket, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+              close(temp->socket);
+              free(temp->username);
+              free(temp);
+            }
+            exit(EXIT_SUCCESS);
           }
           else {
             test[strlen(test) - 1] = '\0';
