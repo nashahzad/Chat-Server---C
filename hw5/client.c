@@ -89,6 +89,13 @@ int main(int argc, char *argv[]) {
         if(FD_ISSET(clientSocket, &readSet)) {
           recv(clientSocket, buffer, MAX_INPUT, 0);
 
+        //IF SOMEONE CTRL-C THE SERVER JUST SHUTDOWN
+        if(buffer[0] == '\0'){
+          fprintf(stderr, "Select was triggered, but nothing in socket came through.\n");
+          close(clientSocket);
+          exit(EXIT_FAILURE);
+        }
+
         if(strlen(buffer) == 1){
           if(buffer[0] == '\n'){
             memset(buffer, 0, 1);
@@ -135,6 +142,8 @@ int main(int argc, char *argv[]) {
             else{
               fprintf(stdout, "%s\n", buffer);
 
+              clientCommandCheck();
+
               //CHECK TO SEE IF SERVER SAID THAT USER NAME WAS ALREADY TAKEN
               char *error = malloc(strlen("ERR 00 USER NAME TAKEN "));
               memset(error, 0, strlen("ERR 00 USER NAME TAKEN "));
@@ -144,6 +153,18 @@ int main(int argc, char *argv[]) {
                 close(clientSocket);
                 free(error);
                 exit(EXIT_FAILURE);
+              }
+              free(error);
+
+              //CHECK TO SEE IF THE SERVER SHUTDOWN AND SENT BYE
+              error = malloc(strlen("BYE "));
+              memset(error, 0, strlen("BYE "));
+              strcat(error, "BYE ");
+              if(strcmp(buffer, error) == 0){
+                fprintf(stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
+                close(clientSocket);
+                free(error);
+                exit(EXIT_SUCCESS);
               }
               free(error);
 
@@ -175,6 +196,11 @@ int main(int argc, char *argv[]) {
           send(clientSocket, message, strlen(message), 0);
           close(clientSocket);
           exit(EXIT_SUCCESS);
+        }
+
+        if(strcmp("/time", buffer) == 0){
+          char *message = "TIME\r\n\r\n\0";
+          send(clientSocket, message, strlen(message), 0);
         }
 
         memset(buffer, 0, MAX_INPUT);
@@ -215,6 +241,58 @@ bool checkProtocol(){
   //REACHES HERE, THEN WENT THROUGH LOOP WITHOUT EVER FINDING PROTOCOL
   fprintf(stderr, "%s\n", "Bad packet from server, didn't follow protocol!");
   return false;
+}
+
+void clientCommandCheck(){
+  if(strlen(buffer) >= 5){
+    
+    //CHECK FOR TIME VERB, EMIT FROM SERVER
+    char *verb = "EMIT";
+    char *temp = malloc(4);
+    strncpy(temp, buffer, 4);
+    if(strcmp(temp, verb) == 0){
+      free(temp);
+      strcpy(buffer, buffer + 5);
+
+      int seconds = atoi(buffer);
+
+      int minutes = seconds / 60;
+      seconds = seconds % 60;
+
+      if(minutes == 0){
+        TIME(0, 0, seconds);
+        return;
+      }
+
+      int hours = minutes / 60;
+      minutes = minutes % 60;
+
+      TIME(hours, minutes, seconds);
+    }
+    free(temp);
+
+
+    //CHECK FOR LIST USERS VERB, UTSIL
+    verb = "UTSIL";
+    temp = malloc(5);
+    strncpy(temp, buffer, 5);
+    if(strcmp(temp, verb) == 0){
+      free(temp);
+      strcpy(buffer, buffer + 6);
+
+      char *token = malloc(sizeof(char) * strlen(buffer));
+      fprintf(stdout, "%s\n", "USERS:");
+      strcpy(token, buffer);
+      token = strtok(token, "\r\n");
+      for(; token != NULL ;token = strtok(NULL, "\r\n")){        
+        if(token == NULL){
+          break;
+        }
+
+        fprintf(stdout, "%s\n", token);;
+      }
+    }
+  }
 }
 
 void removeNewline(char *string, int length){

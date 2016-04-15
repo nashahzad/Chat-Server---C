@@ -32,12 +32,15 @@
 "/logout - Will disconnect with the server.\n"\
 "/listu - It will ask the server to find out who else has been connected to server.\n\n"\
 
+#define TIME(hours, minutes, seconds) fprintf(stdout, "connected for %d hour(s), %d minute(s), and %d second(s)\n", hours, minutes, seconds);
+
 bool verboseFlag = false;
 
 char buffer[MAX_INPUT];
 
 bool checkProtocol();
 
+void clientCommandCheck();
 
 
 void removeNewline(char *string, int length);
