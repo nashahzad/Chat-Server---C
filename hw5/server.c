@@ -1,7 +1,15 @@
 #include "server.h"
 
-static char * users[50] = {0};
-static int userCounter = 0;
+struct connected_user {
+  int socket;
+  char * username;
+  struct connected_user * next;
+  struct connected_user * prev;
+};
+typedef struct connected_user connected_user;
+
+connected_user * list_head = NULL;
+//static int userCounter = 0;
 static char motd[MAX_INPUT] = {0};
 
 int main(int argc, char *argv[]) {
@@ -71,9 +79,11 @@ int main(int argc, char *argv[]) {
   listen(serverSocket, 20); //arbitrary queue length
   printf("Currently listening on port %d\n", portNumber);
   int counter;
+  int commandFlag = 1;
   //run forever until receive /shutdown
   while(1) {
-    write(1, ">", 1);
+    if (commandFlag)
+      write(1, ">", 1);
     readFdSet = activeFdSet;
     if (select(FD_SETSIZE, &readFdSet, NULL, NULL, NULL) == -1) {
       printf("Select failed.\n");
@@ -83,10 +93,12 @@ int main(int argc, char *argv[]) {
       if (FD_ISSET(counter, &readFdSet)) {
         if (counter == serverSocket) {
           //accept an incoming connection
+          commandFlag = 0;
           unsigned int clientLength;
           int clientSocket = accept(serverSocket, (struct sockaddr *) &clientInfo, &clientLength);
           if (clientSocket == -1) {
-            printf("Accept error.\n");
+            int errcode = errno;
+            printf("Accept error. Code %d.\n", errcode);
             fflush(stdout);
           }
           else {
@@ -97,6 +109,7 @@ int main(int argc, char *argv[]) {
         }
         //is there something on stdin for the server?
         else if (counter == 0) {
+          commandFlag = 1;
           char test[MAX_INPUT] = {0};
           fgets(test, MAX_INPUT - 1, stdin);
           if (strncmp("/help\n", test, 6) == 0) {
@@ -106,9 +119,11 @@ int main(int argc, char *argv[]) {
           else if (strncmp("/users\n", test, 7) == 0) {
             printf("/users test\n");
             fflush(stdout);
-            int count = 0;
-            for(; count < userCounter; count++) {
-              printf("%s\n", users[count]);
+            connected_user * iterator = list_head;
+            while (iterator != NULL) {
+              printf("%s\n", iterator->username);
+              fflush(stdout);
+              iterator = iterator->next;
             }
           }
           else if (strncmp("/shutdown\n", test, 10) == 0) {
@@ -128,6 +143,18 @@ int main(int argc, char *argv[]) {
       }
     }
   }
+}
+
+//check if a username is already taken. returns 0 if taken, 1 if not.
+int checkAvailability(char * toCheck) {
+  connected_user * iterator = list_head;
+  while (iterator != NULL) {
+    if (strcmp(iterator->username, toCheck) == 0) {
+      return 0;
+    }
+    iterator = iterator->next;
+  }
+  return 1;
 }
 
 //check if a received message has the correct EOM. returns either 0 or 1
@@ -156,35 +183,70 @@ void * handleClient(void * param) {
   char input[MAX_INPUT] = {0};
   int recvData;
   recvData = recv(client, input, MAX_INPUT, 0);
+
   //check if client started login protocol correctly
   if (recvData > 0) {
     if (strcmp(input, "WOLFIE\r\n\r\n") == 0) {
       send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
     }
   }
+
   memset(input, 0, MAX_INPUT - 1);
   recvData = recv(client, input, MAX_INPUT, 0);
   if (recvData > 0) {
     char check1[5] = {0};
     char check2[5] = {0};
     char name[100] = {0};
+
     //check if the message is IAM <name> \r\n\r\n
     if (checkEOM(input)) {
       int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
       if ((strcmp(check1, "IAM") == 0) /*&& strcmp(check2, "\r\n\r\n") */&& (checkWolfieProtocol == 2)) {
-        char hiResponse[200] = {0};
-        sprintf(hiResponse, "%s", "HI ");
-        strcat(hiResponse, name);
-        strcat(hiResponse, " \r\n\r\n");
-        send(client, hiResponse, strlen(hiResponse), 0);
-        //add user to list
-        users[userCounter++] = input;
-        //and send MOTD
-        char sendMOTD[200] = {0};
-        strcpy(sendMOTD, "MOTD ");
-        strcat(sendMOTD, motd);
-        strcat(sendMOTD, " \r\n\r\n");
-        send(client, sendMOTD, strlen(sendMOTD), 0);
+
+        //first check if the name is taken
+        if (checkAvailability(name)) {
+          char hiResponse[200] = {0};
+          sprintf(hiResponse, "%s", "HI ");
+          strcat(hiResponse, name);
+          strcat(hiResponse, " \r\n\r\n");
+          send(client, hiResponse, strlen(hiResponse), 0);
+
+          //and send MOTD
+          char sendMOTD[200] = {0};
+          strcpy(sendMOTD, "MOTD ");
+          strcat(sendMOTD, motd);
+          strcat(sendMOTD, " \r\n\r\n");
+          send(client, sendMOTD, strlen(sendMOTD), 0);
+
+          //now add the user and his/her information to the list
+          connected_user * currentlyConnected = malloc(sizeof(connected_user));
+          memset(currentlyConnected, 0, sizeof(connected_user));
+          currentlyConnected->socket = client;
+          currentlyConnected->username = malloc(strlen(name) + 1);
+          strcpy(currentlyConnected->username, name);
+          //is the list empty?
+          if (list_head == NULL) {
+            currentlyConnected->prev = NULL;
+            currentlyConnected->next = NULL;
+            list_head = currentlyConnected;
+          }
+          //otherwise go to end and add it there
+          else {
+            connected_user * iterator = list_head;
+            while(iterator->next != NULL) {
+              iterator = iterator->next;
+            }
+            currentlyConnected->prev = iterator;
+            currentlyConnected->next = NULL;
+            iterator->next = currentlyConnected;
+          }
+        }
+        //name already taken, send a different packet
+        else {
+          send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
+          send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+          close(client);
+        }
       }
     }
   }

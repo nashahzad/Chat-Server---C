@@ -21,5 +21,6 @@
 
 void * handleClient(void * param);
 int checkEOM(char * start);
+int checkAvailability(char * toCheck);
 
 #endif
