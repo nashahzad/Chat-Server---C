@@ -3,6 +3,7 @@
 struct connected_user {
   int socket;
   char * username;
+  time_t loginTime;
   struct connected_user * next;
   struct connected_user * prev;
 };
@@ -239,6 +240,7 @@ void * handleClient(void * param) {
           if (list_head == NULL) {
             currentlyConnected->prev = NULL;
             currentlyConnected->next = NULL;
+            currentlyConnected->loginTime = time(NULL);
             list_head = currentlyConnected;
           }
           //otherwise go to end and add it there
@@ -249,6 +251,7 @@ void * handleClient(void * param) {
             }
             currentlyConnected->prev = iterator;
             currentlyConnected->next = NULL;
+            currentlyConnected->loginTime = time(NULL);
             iterator->next = currentlyConnected;
           }
           //then run the communication thread
@@ -336,7 +339,40 @@ void * communicationThread(void * param) {
                     free(iterator);
                     close(c);
                   }
-                  write(1, "here", 4);
+                }
+                else if (strcmp(input, "TIME") == 0) {
+                  time_t now = time(NULL);
+                  int difference = now - iterator->loginTime;
+                  char emitMessage[50] = {0};
+                  sprintf(emitMessage, "%s %d %s", "EMIT", difference, "\r\n\r\n");
+                  send(iterator->socket, emitMessage, strlen(emitMessage), 0);
+                }
+                else if (strcmp(input, "LISTU") == 0) {
+                  //random length (hope that the message isn't that long).
+                  int mallocSize = 101;
+                  char * utsilMessage = malloc(mallocSize);
+                  memset(utsilMessage, 0, mallocSize);
+                  strcpy(utsilMessage, "UTSIL ");
+                  connected_user * temp = list_head;
+                  while (temp != NULL) {
+                    //if we're approaching the end of the malloc's space, need to realloc
+                    if ((strlen(utsilMessage) + strlen(temp->username) + 6) > mallocSize) {
+                      mallocSize += 100;
+                      utsilMessage = realloc(utsilMessage, mallocSize);
+                    }
+                    strcat(utsilMessage, temp->username);
+                    if (temp->next != NULL)
+                      strcat(utsilMessage, " \r\n ");
+                    temp = temp->next;
+                  }
+                  //do we have enough space for the \r\n\r\n?
+                  if ((strlen(utsilMessage) + 6) > mallocSize) {
+                    mallocSize += 10;
+                    utsilMessage = realloc(utsilMessage, mallocSize);
+                  }
+                  strcat(utsilMessage, " \r\n\r\n");
+                  //now have the full message
+                  send(iterator->socket, utsilMessage, strlen(utsilMessage), 0);
                 }
               }
             }

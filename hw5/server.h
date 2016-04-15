@@ -14,6 +14,7 @@
 #include <ctype.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <time.h>
 
 #define _GNU_SOURCE
 #define MAX_INPUT 1024
