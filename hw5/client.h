@@ -40,7 +40,7 @@ char buffer[MAX_INPUT];
 
 bool checkProtocol();
 
-void clientCommandCheck();
+bool clientCommandCheck();
 
 
 void removeNewline(char *string, int length);

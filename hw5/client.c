@@ -142,7 +142,9 @@ int main(int argc, char *argv[]) {
             else{
               fprintf(stdout, "%s\n", buffer);
 
-              clientCommandCheck();
+              if(clientCommandCheck()){
+                continue;
+              }
 
               //CHECK TO SEE IF SERVER SAID THAT USER NAME WAS ALREADY TAKEN
               char *error = malloc(strlen("ERR 00 USER NAME TAKEN "));
@@ -243,7 +245,7 @@ bool checkProtocol(){
   return false;
 }
 
-void clientCommandCheck(){
+bool clientCommandCheck(){
   if(strlen(buffer) >= 5){
     
     //CHECK FOR TIME VERB, EMIT FROM SERVER
@@ -261,13 +263,14 @@ void clientCommandCheck(){
 
       if(minutes == 0){
         TIME(0, 0, seconds);
-        return;
+        return true;;
       }
 
       int hours = minutes / 60;
       minutes = minutes % 60;
 
       TIME(hours, minutes, seconds);
+      return true;
     }
     free(temp);
 
@@ -291,8 +294,11 @@ void clientCommandCheck(){
 
         fprintf(stdout, "%s\n", token);;
       }
+      return true;
     }
+    return false;
   }
+  return false;
 }
 
 void removeNewline(char *string, int length){
