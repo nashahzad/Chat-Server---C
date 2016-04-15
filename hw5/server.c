@@ -11,6 +11,7 @@ typedef struct connected_user connected_user;
 connected_user * list_head = NULL;
 //static int userCounter = 0;
 static char motd[MAX_INPUT] = {0};
+static int cThread = 0;
 
 int main(int argc, char *argv[]) {
   int verboseFlag = 0;
@@ -105,6 +106,10 @@ int main(int argc, char *argv[]) {
             //login thread
             pthread_t tid;
             pthread_create(&tid, NULL, handleClient, &clientSocket);
+          }
+          if ((!cThread) && (list_head != NULL)) {
+            pthread_t cid;
+            pthread_create(&cid, NULL, communicationThread, &cThread);
           }
         }
         //is there something on stdin for the server?
@@ -263,7 +268,45 @@ void * handleClient(void * param) {
   return NULL;
 }
 
-//handle communication (after a login)
-void * handleClient2(void * param) {
+//communication thread. the pointer passed to it is the cThread flag, indicating if it's already running
+void * communicationThread(void * param) {
+  //set cThread to 1 to prevent multiple communicationThreads from spawning
+  *((int *) param) = 1;
+  int c;
+  //since the head of the connected_user list is global, it doesn't need to be passed
+  connected_user * iterator;
+  fd_set clientList, zeroedList;
+  FD_ZERO(&zeroedList);
+  while (list_head != NULL) {
+    iterator = list_head;
+    clientList = zeroedList;
+    while (iterator != NULL) {
+      FD_SET(iterator->socket, &clientList);
+    }
+    if (select(FD_SETSIZE, &clientList, NULL, NULL, NULL) == -1) {
+      printf("Select failed.\n");
+      exit(EXIT_FAILURE);
+    }
+    for(c = 0; c < FD_SETSIZE; ++c) {
+      if (FD_ISSET(c, &clientList)) {
+        iterator = list_head;
+        while (iterator != NULL) {
+          if (iterator->socket == c) {
+            char input[MAX_INPUT] = {0};
+            //since already connected, just listen for communication
+            int data = recv(c, input, MAX_INPUT, 0);
+            if (data > 0) {
+              if (checkEOM(input)) {
+                if (strcmp(input, "BYE") == 0) {
+                  close(c);
+                  write(1, "here", 4);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   return NULL;
 }
