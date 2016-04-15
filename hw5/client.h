@@ -26,11 +26,11 @@
 
 #define USAGE "./client [-hcv] NAME SERVER_IP SERVER_PORT\n-h              Displays this help menu, and returns EXIT_SUCCESS.\n-c              Requests to server to create a new user.\n-v              Verbose print all traffic.\nNAME            Username to display\nSERVER_IP       IP to connect to\nSERVER_PORT     Port to connect to.\n"
 
-#define HELP "HELP MENU\n" \
+#define HELP "\nHELP MENU\n" \
 "/time - Will ask the server for how long you have been connected.\n"\
 "/help - Will pop open help menu of of commands that you are reading right now :D\n"\
 "/logout - Will disconnect with the server.\n"\
-"/listu - It will ask the server to find out who else has been connected to server.\n"\
+"/listu - It will ask the server to find out who else has been connected to server.\n\n"\
 
 bool verboseFlag = false;
 

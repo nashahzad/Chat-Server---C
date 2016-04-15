@@ -66,48 +66,28 @@ int main(int argc, char *argv[]) {
     printf("Connect failed.\n");
     exit(EXIT_FAILURE);
   }
-  printf("%li", send(clientSocket, "WOLFIE\r\n\r\n", strlen("WOLFIE\r\n\r\n"), 0));
+
+  send(clientSocket, "WOLFIE\r\n\r\n", strlen("WOLFIE\r\n\r\n"), 0);
 
   //SET UP I/O MULTIPLEXING
-  int poll = epoll_create(1);
-  struct epoll_event socketEvent, stdinEvent;
-  struct epoll_event *events;
+  //int maxfd = clientSocket + 1;
+  fd_set set, readSet;
 
-  socketEvent.data.fd = clientSocket;
-  socketEvent.events = EPOLLIN | EPOLLET;
-  epoll_ctl(poll, EPOLL_CTL_ADD, clientSocket, &socketEvent);
+  FD_ZERO(&set);
+  FD_SET(clientSocket, &set);
+  FD_SET(0, &set);
 
-  stdinEvent.data.fd = 0;
-  stdinEvent.events = EPOLLIN | EPOLLET;
-  epoll_ctl(poll, EPOLL_CTL_ADD, 0, &stdinEvent);
-
-  events = calloc(2, sizeof(socketEvent));
-  
-
+  int wait = 0;
   //BLOCK UNTIL THERE IS SOMETHING TO ACTUALLY READ FROM STDIN OR SERVER
   while(1){
-    if(epoll_wait(poll, events, 1, 500) != -1){
+    readSet = set;
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){}
 
-      //SOMETHING WAS WRITTEN IN ON STDIN
-      if(events[1].events == 1){
-        read(0, buffer, MAX_INPUT);
-        removeNewline(buffer, MAX_INPUT);
+  else{
 
-        if(verboseFlag){
-          fprintf(stderr, "received from stdin: %s\n", buffer);
-        }
-
-        if(strcmp("/help", buffer) == 0){
-          fprintf(stdout, HELP);
-        }
-
-        memset(buffer, 0, MAX_INPUT);
-      }
-
-      //Received Input from Server
-      else{
-        recv(clientSocket, buffer, MAX_INPUT, 0);
-        write(1, buffer, strlen(buffer));
+        if(FD_ISSET(clientSocket, &readSet)) {
+          recv(clientSocket, buffer, MAX_INPUT, 0);
 
         if(strlen(buffer) == 1){
           if(buffer[0] == '\n'){
@@ -120,6 +100,7 @@ int main(int argc, char *argv[]) {
         }
         //PART OF LOGIN PROCEDURE SEND BACK TO SERVER IAM <NAME>\r\n\r\n
         if(strcmp(buffer, "EIFLOW\r\n\r\n") == 0){
+          fprintf(stdout, "%s\n", buffer);
           char *message = malloc(9 + strlen(name));
           memset(message, 0, 9 + strlen(name));
           strcat(message, "IAM ");
@@ -139,10 +120,11 @@ int main(int argc, char *argv[]) {
           }
 
           else{
-            char *login = malloc(3 + strlen(name));
+            char *login = malloc(4 + strlen(name));
             memset(login, 0, 3 + strlen(name));
             strcat(login, "HI ");
             strcat(login, name);
+            strcat(login, " ");
 
             //SECOND PART TO LOGIN PROCEDURE SERVER SAYS HI
             if(strcmp(buffer, login) == 0){
@@ -158,8 +140,26 @@ int main(int argc, char *argv[]) {
           }  
         } 
         //JUST TO MAKE SURE TO THAT BUFFER GETS SET BACK TO ALL NULL TERMINATORS
-        memset(buffer, 0, MAX_INPUT);     
+        memset(buffer, 0, MAX_INPUT);    
       }
+      //is there something on stdin for the server?
+      else if (FD_ISSET(0, &readSet)) {
+        fgets(buffer, MAX_INPUT - 1, stdin);
+        fflush(stdin);
+        fflush(stdout);
+        removeNewline(buffer, MAX_INPUT);
+
+        if(verboseFlag){
+          fprintf(stderr, "received from stdin: %s\n", buffer);
+        }
+
+        if(strcmp("/help", buffer) == 0){
+          fprintf(stdout, HELP);
+        }
+
+        memset(buffer, 0, MAX_INPUT);
+      }     
+      
     }
   }
 }
@@ -171,19 +171,25 @@ bool checkProtocol(){
     return false;
   }
 
+  bool flag = false;
   for(int i = 0; i < size; i++){
-    if(buffer[i] == '\r' && (size - i - 1) >= 4){
+    if(buffer[i] == '\r' && (size - i) >= 4){
       char *check = malloc(4);
       memset(check, 0, 4);
       strncpy(check, buffer + i, 4);
 
       if(strcmp(check, "\r\n\r\n") == 0){
         //IF IT GETS HERE THEN PACKET FOLLOWED PROTOCOL
-        //JUST MEMSET PROTOCOL AND EVERYTHING PAST IT WITH 0
-        memset(buffer + i, 0, MAX_INPUT - i);
-        return true;
+        //JUST MEMSET PROTOCOL 
+        memset(buffer + i, 0, 4);
+        flag = true;
       }
+      free(check);
     }
+  }
+
+  if(flag){
+    return true;
   }
 
   //REACHES HERE, THEN WENT THROUGH LOOP WITHOUT EVER FINDING PROTOCOL
@@ -195,7 +201,6 @@ void removeNewline(char *string, int length){
   for(int i = 0; i < length; i++){
     if(string[i] == '\n'){
       string[i] = '\0';
-      return;
     }
   }
 }
