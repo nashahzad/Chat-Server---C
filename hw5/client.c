@@ -80,6 +80,7 @@ int main(int argc, char *argv[]) {
   int wait = 0;
   //BLOCK UNTIL THERE IS SOMETHING TO ACTUALLY READ FROM STDIN OR SERVER
   while(1){
+    write(1, ">", 1);
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){}
@@ -107,7 +108,9 @@ int main(int argc, char *argv[]) {
         }
         //PART OF LOGIN PROCEDURE SEND BACK TO SERVER IAM <NAME>\r\n\r\n
         if(strcmp(buffer, "EIFLOW\r\n\r\n") == 0){
-          fprintf(stdout, "%s\n", buffer);
+          if(verboseFlag){
+            fprintf(stdout, "%s\n", buffer);
+          }
           char *message = malloc(9 + strlen(name));
           memset(message, 0, 9 + strlen(name));
           strcat(message, "IAM ");
@@ -140,8 +143,8 @@ int main(int argc, char *argv[]) {
 
             //NOT PART OF LOGIN PROCESS
             else{
-              fprintf(stdout, "%s\n", buffer);
 
+              //CHECK TO SEE IF ITS A RESPONSE TO CLIENT COMMAND FROM SERVER
               if(clientCommandCheck()){
                 continue;
               }
@@ -151,7 +154,7 @@ int main(int argc, char *argv[]) {
               memset(error, 0, strlen("ERR 00 USER NAME TAKEN "));
               strcat(error, "ERR 00 USER NAME TAKEN ");
               if(strcmp(buffer, error) == 0){
-                fprintf(stderr, "%s\n", "Due to this error will now be closing the client.");
+                fprintf(stderr, "%s\n", "Username already taken, due to this error will now be closing the client.");
                 close(clientSocket);
                 free(error);
                 exit(EXIT_FAILURE);
@@ -170,6 +173,7 @@ int main(int argc, char *argv[]) {
               }
               free(error);
 
+              fprintf(stdout, "%s\n", buffer);
             }
 
             free(login);
