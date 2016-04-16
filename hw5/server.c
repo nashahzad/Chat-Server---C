@@ -264,7 +264,14 @@ void * handleClient(void * param) {
           }
           //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
           else {
-            write(commPipe[1], "a", 1);
+            int PID = fork();
+            if(PID == 0){
+              close(commPipe[0]);
+              write(commPipe[1], "a", 1);
+              close(commPipe[1]);
+              exit(0);
+            }
+            waitpid(PID, NULL, 0);
           }
         }
         //name already taken, send a different packet
@@ -288,11 +295,11 @@ void * communicationThread(void * param) {
   connected_user * iterator;
   fd_set clientList, zeroedList;
   FD_ZERO(&zeroedList);
-  FD_SET(commPipe[0], &zeroedList);
   //add the read end of the pipe to detect when to update fd's
   while (list_head != NULL) {
     iterator = list_head;
     clientList = zeroedList;
+    FD_SET(commPipe[0], &clientList);
     while (iterator != NULL) {
       FD_SET(iterator->socket, &clientList);
       iterator = iterator->next;
