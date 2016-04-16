@@ -110,6 +110,7 @@ int main(int argc, char *argv[]) {
             //login thread
             pthread_t tid;
             pthread_create(&tid, NULL, handleClient, &clientSocket);
+            pthread_join(tid, NULL);
           }
         }
         //is there something on stdin for the server?
@@ -259,19 +260,14 @@ void * handleClient(void * param) {
           }
           //then run the communication thread
           if ((!cThread) && (list_head != NULL)) {
-            pthread_t cid;
             pthread_create(&cid, NULL, communicationThread, &cThread);
+            pthread_detach(cid);
           }
           //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
           else {
-            int PID = fork();
-            if(PID == 0){
-              close(commPipe[0]);
-              write(commPipe[1], "a", 1);
-              close(commPipe[1]);
-              exit(0);
-            }
-            waitpid(PID, NULL, 0);
+            pthread_cancel(cid);
+            pthread_create(&cid, NULL, communicationThread, &cThread);
+            pthread_detach(cid);
           }
         }
         //name already taken, send a different packet
