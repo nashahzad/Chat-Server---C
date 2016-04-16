@@ -10,17 +10,15 @@ struct connected_user {
 typedef struct connected_user connected_user;
 
 connected_user * list_head = NULL;
-//static int userCounter = 0;
 static char motd[MAX_INPUT] = {0};
 static int cThread = 0;
+static int commPipe[2];
 
 int main(int argc, char *argv[]) {
   int verboseFlag = 0;
   //first check the # of arg's to see if any flags were given
   int opt;
   int portNumber;
-  //char message[MAX_INPUT] = {0};
-  //char * users[50] = {0};
   if ((argc == 4) || (argc == 5)) {
     while((opt = getopt(argc, argv, "hv")) != -1) {
       switch(opt) {
@@ -55,7 +53,7 @@ int main(int argc, char *argv[]) {
   //create socket
   int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if (serverSocket == -1) {
-    printf("Failed to make server socket.\n");
+    printf("Failed to make server socket. Quitting...\n");
     exit(EXIT_FAILURE);
   }
 
@@ -67,7 +65,7 @@ int main(int argc, char *argv[]) {
   serverInfo.sin_port = htons(portNumber);
   serverInfo.sin_addr.s_addr = htonl(INADDR_ANY);
   if (bind(serverSocket, (struct sockaddr *) &serverInfo, sizeof(serverInfo)) == -1) {
-    printf("Failed to bind to port %d\n", portNumber);
+    printf("Failed to bind to port %d. Quitting...\n", portNumber);
     exit(EXIT_FAILURE);
   }
 
@@ -82,13 +80,18 @@ int main(int argc, char *argv[]) {
   printf("Currently listening on port %d\n", portNumber);
   int counter;
   int commandFlag = 1;
+  //create the pipe
+  if (pipe(commPipe)) {
+    printf("Pipe failed. Quitting...\n");
+    exit(EXIT_FAILURE);
+  }
   //run forever until receive /shutdown
   while(1) {
     if (commandFlag)
       write(1, ">", 1);
     readFdSet = activeFdSet;
     if (select(FD_SETSIZE, &readFdSet, NULL, NULL, NULL) == -1) {
-      printf("Select failed.\n");
+      printf("Select failed. Quitting...\n");
       exit(EXIT_FAILURE);
     }
     for(counter = 0; counter < FD_SETSIZE; ++counter) {
@@ -259,6 +262,10 @@ void * handleClient(void * param) {
             pthread_t cid;
             pthread_create(&cid, NULL, communicationThread, &cThread);
           }
+          //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
+          else {
+            write(commPipe[1], "a", 1);
+          }
         }
         //name already taken, send a different packet
         else {
@@ -281,6 +288,8 @@ void * communicationThread(void * param) {
   connected_user * iterator;
   fd_set clientList, zeroedList;
   FD_ZERO(&zeroedList);
+  FD_SET(commPipe[0], &zeroedList);
+  //add the read end of the pipe to detect when to update fd's
   while (list_head != NULL) {
     iterator = list_head;
     clientList = zeroedList;
@@ -291,6 +300,17 @@ void * communicationThread(void * param) {
     if (select(FD_SETSIZE, &clientList, NULL, NULL, NULL) == -1) {
       printf("Select failed.\n");
       exit(EXIT_FAILURE);
+    }
+    //new connection?
+    if (FD_ISSET(commPipe[0], &clientList)) {
+      char stuff[3];
+      read(commPipe[0], stuff, 1);
+      iterator = list_head;
+      clientList = zeroedList;
+      while (iterator != NULL) {
+        FD_SET(iterator->socket, &clientList);
+        iterator = iterator->next;
+      }
     }
     for(c = 0; c < FD_SETSIZE; ++c) {
       if (FD_ISSET(c, &clientList)) {
@@ -339,6 +359,7 @@ void * communicationThread(void * param) {
                     free(iterator);
                     close(c);
                   }
+                  write(commPipe[1], "a", 1);
                 }
                 else if (strcmp(input, "TIME") == 0) {
                   time_t now = time(NULL);
