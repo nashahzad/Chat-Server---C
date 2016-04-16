@@ -308,7 +308,7 @@ void * communicationThread(void * param) {
       exit(EXIT_FAILURE);
     }
     //new connection?
-    if (FD_ISSET(commPipe[0], &clientList)) {
+    if (FD_ISSET(commPipe[0], &clientList)) {      
       char stuff[3];
       read(commPipe[0], stuff, 1);
       iterator = list_head;
