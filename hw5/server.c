@@ -290,7 +290,6 @@ void * handleClient(void * param) {
 void * communicationThread(void * param) {
   //set cThread to 1 to prevent multiple communicationThreads from spawning
   *((int *) param) = 1;
-  int c;
   //since the head of the connected_user list is global, it doesn't need to be passed
   connected_user * iterator;
   fd_set clientList, zeroedList;
@@ -319,15 +318,12 @@ void * communicationThread(void * param) {
         iterator = iterator->next;
       }
     }
-    for(c = 0; c < FD_SETSIZE; ++c) {
-      if (FD_ISSET(c, &clientList)) {
-        iterator = list_head;
-        while (iterator != NULL) {
+    for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
+      if (FD_ISSET(iterator->socket, &clientList)) {
           //is this socket the one with input?
-          if (iterator->socket == c) {
             char input[MAX_INPUT] = {0};
             //since already connected, just listen for communication
-            int data = recv(c, input, MAX_INPUT, 0);
+            int data = recv(iterator->socket, input, MAX_INPUT, 0);
             if (data > 0) {
               if (checkEOM(input)) {
                 //was the response a /logout?
@@ -336,9 +332,9 @@ void * communicationThread(void * param) {
                   //only one element in the list
                   if ((iterator->prev == NULL) && (iterator->next == NULL)) {
                     list_head = NULL;
+                    close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
-                    close(c);
                     *((int *) param) = 0;
                     //if there's no user, then end the thread
                     return NULL;
@@ -347,24 +343,24 @@ void * communicationThread(void * param) {
                   if (iterator->prev == NULL) {
                     iterator->next->prev = NULL;
                     list_head = iterator->next;
+                    close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
-                    close(c);
                   }
                   //if at end
                   else if (iterator->next == NULL) {
-                    iterator->prev->next = NULL;
+                    iterator->prev->next = NULL;                    
+                    close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
-                    close(c);
                   }
                   //if in between
                   else {
                     iterator->prev->next = iterator->next;
-                    iterator->next->prev = iterator->prev;
+                    iterator->next->prev = iterator->prev;                    
+                    close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
-                    close(c);
                   }
                   write(commPipe[1], "a", 1);
                 }
@@ -405,13 +401,7 @@ void * communicationThread(void * param) {
               }
             }
           }
-          //if it doesn't, go to the next one in the list
-          else {
-            iterator = iterator->next;
-          }
         }
       }
-    }
-  }
   return NULL;
 }
