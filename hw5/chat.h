@@ -21,4 +21,10 @@
 #include <sys/epoll.h>
 
 
+#define MAX_INPUT 1024
+
+char buffer[MAX_INPUT];
+
+void removeNewline(char *string, int length);
+
 #endif
