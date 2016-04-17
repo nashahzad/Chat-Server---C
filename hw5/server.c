@@ -324,6 +324,8 @@ void * communicationThread(void * param) {
               if (checkEOM(input)) {
                 //was the response a /logout?
                 if (strcmp(input, "BYE") == 0) {
+                  //take note of the name
+                //  char * storeName;
                   //need to remove the socket from the list and free up the memory it took up....but where is the user on the list?
                   //only one element in the list
                   if ((iterator->prev == NULL) && (iterator->next == NULL)) {
@@ -357,6 +359,11 @@ void * communicationThread(void * param) {
                     close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
+                  }
+                  //need to send UOFF to the other users
+                  connected_user * temp = list_head;
+                  while (temp != NULL) {
+
                   }
                   write(commPipe[1], "a", 1);
                 }
@@ -421,6 +428,8 @@ void * communicationThread(void * param) {
                       send(sender, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
                     }
                     else {
+                      //need to add back the \r\n\r\n
+                      strcat(input, "\r\n\r\n");
                       send(sender, input, strlen(input), 0);
                       send(receiver, input, strlen(input), 0);
                     }
@@ -434,6 +443,10 @@ void * communicationThread(void * param) {
                 }
               }
             }
+            //the client either logged out or shut down
+            if (data == 0) {
+
+            }
           }
         }
       }
@@ -444,8 +457,8 @@ void * communicationThread(void * param) {
 //MSG <to> <from>
 //    ^input starts at to
 int parseMSG(char * input, char ** to, char ** from) {
-  int toSize = 30;
-  int fromSize = 30;
+  int toSize = 1;
+  int fromSize = 1;
   char * toUser = malloc(toSize);
   char * fromUser = malloc(fromSize);
   int counter = 0;
