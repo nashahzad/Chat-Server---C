@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 
   else{
 
-        if(FD_ISSET(clientSocket, &readSet)) {
+      if(FD_ISSET(clientSocket, &readSet)) {
           recv(clientSocket, buffer, MAX_INPUT, 0);
 
         //IF SOMEONE CTRL-C THE SERVER JUST SHUTDOWN
@@ -237,7 +237,20 @@ int main(int argc, char *argv[]) {
             recv(iterator->fd, buffer, MAX_INPUT, 0);
             removeNewline(buffer, strlen(buffer));
 
+            //TYPED /CLOSE IN CHAT OR CLOSED XTERM WINDOW
+            if(strcmp("/close", buffer) == 0 || strlen(buffer) == 0){
+              kill(iterator->PID, 9);
+              close(iterator->fd);
+              removeChat(iterator);
+              continue;
+            }
 
+            //PROBABLY JUST MESSAGE TO PERSON
+            char *message = malloc(MAX_INPUT);
+            memset(message, 0, MAX_INPUT);
+            sprintf(message, "MSG %s %s %s \r\n\r\n", iterator->name, name, buffer);
+            send(clientSocket, message, strlen(message), 0);
+            free(message);
           }
         }
       }
@@ -333,7 +346,7 @@ bool clientCommandCheck(){
     return false;
   }
 
-  //HANDLER FOR MSG VERB HERE
+  //HANDLER FOR MSG VERB HERE, RECEIVING IT FROM SERVER
   else if(strlen(buffer) > 3){
     
     char *verb = malloc(3);
@@ -351,6 +364,16 @@ bool clientCommandCheck(){
       strcpy(to, token);
 
       token = strtok(NULL, " ");
+      char *from = malloc(strlen(token));
+      strcpy(from, token);
+
+      if(strcmp(from, to) == 0){
+        free(from);
+        free(to);
+        free(token);
+        fprintf(stderr, "%s\n", "Messaging yourself?!");
+      }
+
       token = strtok(NULL, " ");
 
       char *message = malloc(MAX_INPUT);
@@ -360,13 +383,55 @@ bool clientCommandCheck(){
         strcat(message, " \0");
       }
 
-      int chatSocket = socket(AF_UNIX, SOCK_STREAM, 0);
-      if(chatSocket == -1){
-        fprintf(stderr, "%s\n", "Unable to make UNIX domain socket!");
+      if(strcmp(from, name) == 0){
+        //LOOKING TO SEE IF A CHAT IS ALREADY OPEN IF SO JUST WRITE TO THAT FD
+        bool flag = false;
+        for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
+          if(strcmp(iterator->name, to)){
+            send(iterator->fd, message, strlen(message), 0);
+            flag = true;
+            break;
+          }
+        }
+        if(!flag){
+          int chatSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+          if(chatSocket == -1){
+            fprintf(stderr, "%s\n", "Unable to make UNIX domain socket!");
+          }
+
+          XTERM(offset, to, chatSocket);
+          addChat(to, chatSocket, PID);
+          send(chatSocket, message, strlen(message), 0);
+        }
       }
 
-      XTERM(offset, to, chatSocket);
-      addChat(to, chatSocket, PID);
+      else if(strcmp(to, name) == 0){
+        //LOOKING TO SEE IF A CHAT IS ALREADY OPEN IF SO JUST WRITE TO THAT FD
+        bool flag = false;
+        for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
+          if(strcmp(iterator->name, from)){
+            send(iterator->fd, message, strlen(message), 0);
+            flag = true;
+            break;
+          }
+        }
+        if(!flag){
+          int chatSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+          if(chatSocket == -1){
+            fprintf(stderr, "%s\n", "Unable to make UNIX domain socket!");
+          }
+
+          XTERM(offset, from, chatSocket);
+          addChat(from, chatSocket, PID);
+          send(chatSocket, message, strlen(message), 0);
+        }
+      }
+
+      free(from);
+      free(to);
+      free(token);
+      free(message);
+      return true;
     }
 
 
@@ -399,6 +464,27 @@ void addChat(char *name, int fd, int PID){
   }
 }
 
+void removeChat(chat *iterator){
+  if(iterator->next == NULL && iterator->prev == NULL){
+    head = NULL;
+    free(iterator);
+  }
+  else if(iterator->next != NULL && iterator->prev == NULL){
+    iterator->next->prev = NULL;
+    head = iterator->next;
+    free(iterator);
+  }
+  else if(iterator->next == NULL && iterator->prev != NULL){
+    iterator->prev->next = NULL;
+    free(iterator);
+  }
+  else{
+    iterator->prev->next = iterator->next;
+    iterator->next->prev = iterator->prev;
+    free(iterator);
+  }
+}
+
 void handleChatMessageSTDIN(){
   //Didn't write in any anything for <to> and <message>
   if(strlen(buffer) == 5 || strlen(buffer) == 6){
@@ -419,6 +505,14 @@ void handleChatMessageSTDIN(){
   }
   char *to = malloc(strlen(token));
   strcpy(to, token);
+
+  if(strcmp(to, name) == 0){
+    free(to);
+    free(token);
+    fprintf(stderr, "%s\n", "Attempting to talk to yourself?!");
+    return;
+  }
+
 
   token = strtok(NULL, " ");
   //no <message>

@@ -85,5 +85,7 @@ void handleChatMessageSTDIN();
 
 void removeNewline(char *string, int length);
 
+void removeChat(chat *iterator);
+
 
 #endif
