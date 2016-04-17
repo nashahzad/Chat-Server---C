@@ -402,7 +402,8 @@ void * communicationThread(void * param) {
                   char * startParse = &input[4];
                   char * to;
                   char * from;
-                  if (parseMSG(startParse, &to, &from)) {
+                  int test = parseMSG(startParse, &to, &from);
+                  if (test) {
                     //if successful, simply send the input back to both the sender and receiver
                     connected_user * temp = list_head;
                     int sender = 0;
@@ -412,6 +413,7 @@ void * communicationThread(void * param) {
                         receiver = temp->socket;
                       if (strcmp(temp->username, from) == 0)
                         sender = temp->socket;
+                      temp = temp->next;
                     }
                     //need to check if the sockets were set before sending (aka does the user actually exist)
                     //or if the user is trying to talk to themselves
