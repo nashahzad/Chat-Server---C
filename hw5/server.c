@@ -304,7 +304,7 @@ void * communicationThread(void * param) {
       exit(EXIT_FAILURE);
     }
     //new connection?
-    if (FD_ISSET(commPipe[0], &clientList)) {      
+    if (FD_ISSET(commPipe[0], &clientList)) {
       char stuff[3];
       read(commPipe[0], stuff, 1);
       iterator = list_head;
@@ -345,7 +345,7 @@ void * communicationThread(void * param) {
                   }
                   //if at end
                   else if (iterator->next == NULL) {
-                    iterator->prev->next = NULL;                    
+                    iterator->prev->next = NULL;
                     close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
@@ -353,7 +353,7 @@ void * communicationThread(void * param) {
                   //if in between
                   else {
                     iterator->prev->next = iterator->next;
-                    iterator->next->prev = iterator->prev;                    
+                    iterator->next->prev = iterator->prev;
                     close(iterator->socket);
                     free(iterator->username);
                     free(iterator);
@@ -393,6 +393,42 @@ void * communicationThread(void * param) {
                   strcat(utsilMessage, " \r\n\r\n");
                   //now have the full message
                   send(iterator->socket, utsilMessage, strlen(utsilMessage), 0);
+                  //free the pointer
+                  free(utsilMessage);
+                }
+                else if (strncmp(input, "MSG", 3) == 0) {
+                  //MSG <to> <from>
+                  //0123^ start parsing here
+                  char * startParse = &input[4];
+                  char * to;
+                  char * from;
+                  if (parseMSG(startParse, &to, &from)) {
+                    //if successful, simply send the input back to both the sender and receiver
+                    connected_user * temp = list_head;
+                    int sender = 0;
+                    int receiver = 0;
+                    while (temp != NULL) {
+                      if (strcmp(temp->username, to) == 0)
+                        receiver = temp->socket;
+                      if (strcmp(temp->username, from) == 0)
+                        sender = temp->socket;
+                    }
+                    //need to check if the sockets were set before sending (aka does the user actually exist)
+                    //or if the user is trying to talk to themselves
+                    if ((sender == 0) || (receiver == 0)) {
+                      send(sender, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
+                    }
+                    else {
+                      send(sender, input, strlen(input), 0);
+                      send(receiver, input, strlen(input), 0);
+                    }
+                    //free malloc space afterwards
+                    free(to);
+                    free(from);
+                  }
+                  else {
+                    //otherwise..? this means server ran out of memory..idk
+                  }
                 }
               }
             }
@@ -400,4 +436,87 @@ void * communicationThread(void * param) {
         }
       }
   return NULL;
+}
+
+//looks through the input string for the sender and receiver
+//MSG <to> <from>
+//    ^input starts at to
+int parseMSG(char * input, char ** to, char ** from) {
+  int toSize = 30;
+  int fromSize = 30;
+  char * toUser = malloc(toSize);
+  char * fromUser = malloc(fromSize);
+  int counter = 0;
+  //if malloc fails, immediately return
+  if ((toUser == NULL) || (fromUser == NULL))
+    return 0;
+
+  //first get the receiver
+  while (input[counter] != ' ') {
+    //we're still reading the to field, why would there be a null terminator here? (aka message is ill-formed)
+    if (input[counter] == '\0') {
+      free(toUser);
+      free(fromUser);
+      return 0;
+    }
+    toUser[counter] = input[counter];
+    counter++;
+    //have we reached the end of the space we malloc'd?
+    if (counter == toSize) {
+      //add a small amount
+      toSize += 16;
+      char * temp = realloc(toUser, toSize);
+      //if realloc fails, immediately return. when realloc fails, need to free the pointer
+      if (temp == NULL) {
+        free(toUser);
+        free(fromUser);
+        return 0;
+      }
+      else {
+        toUser = temp;
+      }
+    }
+  }
+  //by the end of this loop, the entire <to> username will be copied.
+  //need to add a null terminator to the end of the string. there will always be space
+  //to add it since realloc is called whenever counter reaches the malloc size
+  toUser[counter++] = '\0';
+
+  //now get the sender.
+  char * temp = input + counter;
+  counter = 0;
+  while (temp[counter] != ' ') {
+    if (temp[counter] == '\0') {
+      fromUser[counter++] = '\0';
+      break;
+    }
+    fromUser[counter] = temp[counter];
+    counter++;
+    if (counter == fromSize) {
+      fromSize += 16;
+      char * temp2 = realloc(fromUser, fromSize);
+      if (temp2 == NULL) {
+        free(toUser);
+        free(fromUser);
+        return 0;
+      }
+      else {
+        fromUser = temp2;
+      }
+    }
+  }
+  //don't need to add null terminator, while loop already does that.
+  //realloc so they only occupy just enough space
+  char * temp3 = realloc(toUser, strlen(toUser) + 1);
+  char * temp4 = realloc(fromUser, strlen(fromUser) + 1);
+  if ((temp3 == NULL) || (temp4 == NULL)) {
+    free(toUser);
+    free(fromUser);
+    return 0;
+  }
+  else {
+    * to = toUser;
+    * from = fromUser;
+    return 1;
+  }
 }
