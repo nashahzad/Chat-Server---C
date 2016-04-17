@@ -1,3 +1,9 @@
+#include "chat.h"
 
+int main(int argc, char *argv[]){
+	fprintf(stderr, "%s\n", "Blarg!!!!!!!!!!!!!!!");
 
-int main(){}
+	while(1){}
+
+	return 0;
+}

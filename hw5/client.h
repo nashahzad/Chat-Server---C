@@ -20,7 +20,15 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 
-
+struct chat{
+	int fd;
+	int PID;
+	char *name;
+	struct chat *next;
+	struct chat *prev;
+};
+typedef struct chat chat;
+chat *head = NULL;
 
 #define MAX_INPUT 1024
 
@@ -34,7 +42,36 @@
 
 #define TIME(hours, minutes, seconds) fprintf(stdout, "connected for %d hour(s), %d minute(s), and %d second(s)\n", hours, minutes, seconds);
 
+#define XTERM(offset, name, fd) char *arg[9]; \
+	arg[8] = NULL; \
+	for(int i = 0; i < 8; i++){ \
+		arg[i] = malloc(MAX_INPUT); \
+		memset(arg[i], 0, MAX_INPUT); \
+	}	\
+	strcat(arg[0], "xterm"); \
+	sprintf(arg[1], "-geometry"); \
+	sprintf(arg[2], "45x35+%d", offset); \
+	sprintf(arg[3], "-T"); \
+	sprintf(arg[4], "%s", name); \
+	sprintf(arg[5], "-e"); \
+	sprintf(arg[6], "./chat"); \
+	sprintf(arg[7], "%d", fd); \
+	int PID = fork(); \
+	if(PID == 0){ \
+		execvp(arg[0], arg); \
+		exit(EXIT_FAILURE); \
+	} \
+	for(int i = 0; i < 8; i++){ \
+		free(arg[i]);\
+	} \
+
 bool verboseFlag = false;
+
+char name[MAX_INPUT] = {0};
+
+int clientSocket;
+
+int offset = 10;
 
 char buffer[MAX_INPUT];
 
@@ -42,6 +79,9 @@ bool checkProtocol();
 
 bool clientCommandCheck();
 
+void addChat(char *name, int fd, int PID);
+
+void handleChatMessageSTDIN();
 
 void removeNewline(char *string, int length);
 

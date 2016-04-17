@@ -2,8 +2,7 @@
 
 int main(int argc, char *argv[]) {
   memset(buffer, 0, MAX_INPUT);
-  int createFlag = 0;
-  char name[MAX_INPUT] = {0};
+  int createFlag = 0;  
   int serverPort;
   char serverIP[MAX_INPUT] = {0};
   //first check the # of arg's to see if any flags were given
@@ -47,7 +46,7 @@ int main(int argc, char *argv[]) {
   }
 
   //make socket
-  int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+  clientSocket = socket(AF_INET, SOCK_STREAM, 0);
   if (clientSocket == -1) {
     printf("Failed to make server socket.\n");
     exit(EXIT_FAILURE);
@@ -82,6 +81,12 @@ int main(int argc, char *argv[]) {
   while(1){
     write(1, ">", 1);
     readSet = set;
+
+    //ADD CHAT FD'S TO THE FD_SET TO MULTIPLEX ON
+    for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
+      FD_SET(iterator->fd, &readSet);
+    }
+
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){}
 
@@ -181,7 +186,8 @@ int main(int argc, char *argv[]) {
         //JUST TO MAKE SURE TO THAT BUFFER GETS SET BACK TO ALL NULL TERMINATORS
         memset(buffer, 0, MAX_INPUT);
       }
-      //is there something on stdin for the server?
+
+      //ELSE IF IS THERE SOMETHING ON STDIN
       else if (FD_ISSET(0, &readSet)) {
         fgets(buffer, MAX_INPUT - 1, stdin);
         fflush(stdin);
@@ -213,25 +219,27 @@ int main(int argc, char *argv[]) {
           send(clientSocket, message, strlen(message), 0);
         }
 
-        if(strncmp("/chat", buffer, 5) == 0) {
-          char sendTo[100] = {0};
-          char sendMessage[300] = {0};
-          // /chat <to> <msg>
-          // 0123456 <start scanning from here
-          char * scanFrom = &buffer[6];
-          sscanf(scanFrom, "%s %s", sendTo, sendMessage);
-          char tempMessage[400] = {0};
-          strcpy(tempMessage, "MSG ");
-          strcat(tempMessage, sendTo);
-          strcat(tempMessage, " ");
-          strcat(tempMessage, name);
-          strcat(tempMessage, " ");
-          strcat(tempMessage, sendMessage);
-          strcat(tempMessage, "\r\n\r\n");
-          send(clientSocket, tempMessage, strlen(tempMessage), 0);
+        char *comp = malloc(6);
+        memset(comp, 0, 6);
+        strncpy(comp, buffer, 5);
+        if(strcmp("/chat", comp) == 0) {
+          handleChatMessageSTDIN();
         }
+        free(comp);
 
         memset(buffer, 0, MAX_INPUT);
+      }
+
+      //MAYBE THERE'S SOMETHING FROM CHAT FD'S
+      else{
+        for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
+          if(FD_ISSET(iterator->fd, &readSet)){
+            recv(iterator->fd, buffer, MAX_INPUT, 0);
+            removeNewline(buffer, strlen(buffer));
+
+
+          }
+        }
       }
 
     }
@@ -324,7 +332,127 @@ bool clientCommandCheck(){
     }
     return false;
   }
+
+  //HANDLER FOR MSG VERB HERE
+  else if(strlen(buffer) > 3){
+    
+    char *verb = malloc(3);
+    strncpy(verb, buffer, 3);
+    if(strcmp(verb, "MSG") == 0){
+      char *token = malloc(MAX_INPUT);
+      
+      memset(token, 0, MAX_INPUT);
+      strcpy(token, buffer);
+      
+      token = strtok(token, " ");
+      token = strtok(NULL, " ");
+
+      char *to = malloc(strlen(token));
+      strcpy(to, token);
+
+      token = strtok(NULL, " ");
+      token = strtok(NULL, " ");
+
+      char *message = malloc(MAX_INPUT);
+      memset(message, 0, MAX_INPUT);
+      for(; token != NULL; token = strtok(NULL, " ")){
+        strcat(message, token);
+        strcat(message, " \0");
+      }
+
+      int chatSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+      if(chatSocket == -1){
+        fprintf(stderr, "%s\n", "Unable to make UNIX domain socket!");
+      }
+
+      XTERM(offset, to, chatSocket);
+      addChat(to, chatSocket, PID);
+    }
+
+
+  }
   return false;
+}
+
+void addChat(char *name, int fd, int PID){
+  if(head == NULL){
+    head = malloc(sizeof(chat));
+    head->name = name;
+    head->fd = fd;
+    head->PID = PID;
+
+    head->next = NULL;
+    head->prev = NULL;
+  }
+
+  else{
+    chat *tempHead = head;
+
+    head = malloc(sizeof(chat));
+    head->name = name;
+    head->fd = fd;
+    head->PID = PID;
+
+    head->next = tempHead;
+    head->prev = NULL;
+    tempHead->prev = head;
+  }
+}
+
+void handleChatMessageSTDIN(){
+  //Didn't write in any anything for <to> and <message>
+  if(strlen(buffer) == 5 || strlen(buffer) == 6){
+    return;
+  }
+
+  char *token = malloc(MAX_INPUT);
+  memset(token, 0, MAX_INPUT);
+  strcpy(token, buffer);
+
+  token = strtok(token, " ");
+  token = strtok(NULL, " ");
+
+  //no <to>
+  if(token == NULL){
+    free(token);
+    return;
+  }
+  char *to = malloc(strlen(token));
+  strcpy(to, token);
+
+  token = strtok(NULL, " ");
+  //no <message>
+  if(token == NULL){
+    free(to);
+    free(token);
+    return;
+  }
+
+  char *message = malloc(MAX_INPUT);
+  memset(message, 0, MAX_INPUT);
+  for(; token != NULL; token = strtok(NULL, " ")){
+    strcat(message, token);
+    strcat(message, " \0");
+  }
+
+  char *serverSend = malloc(MAX_INPUT);
+  memset(serverSend, 0, MAX_INPUT);
+  strcat(serverSend, "MSG ");
+  strcat(serverSend, to);
+  strcat(serverSend, " ");
+  strcat(serverSend, name);
+  strcat(serverSend, " ");
+  strcat(serverSend, message);
+  strcat(serverSend, " \r\n\r\n");
+
+  send(clientSocket, serverSend, strlen(serverSend), 0);
+
+  free(message);
+  free(token);
+  free(to);
+  free(serverSend);
+
+  return;
 }
 
 void removeNewline(char *string, int length){
