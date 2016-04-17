@@ -325,13 +325,13 @@ void * communicationThread(void * param) {
                 //was the response a /logout?
                 if (strcmp(input, "BYE") == 0) {
                   //take note of the name
-                //  char * storeName;
+                  char * storeName;
                   //need to remove the socket from the list and free up the memory it took up....but where is the user on the list?
                   //only one element in the list
                   if ((iterator->prev == NULL) && (iterator->next == NULL)) {
                     list_head = NULL;
                     close(iterator->socket);
-                    free(iterator->username);
+                    storeName = iterator->username;
                     free(iterator);
                     *((int *) param) = 0;
                     //if there's no user, then end the thread
@@ -342,14 +342,14 @@ void * communicationThread(void * param) {
                     iterator->next->prev = NULL;
                     list_head = iterator->next;
                     close(iterator->socket);
-                    free(iterator->username);
+                    storeName = iterator->username;
                     free(iterator);
                   }
                   //if at end
                   else if (iterator->next == NULL) {
                     iterator->prev->next = NULL;
                     close(iterator->socket);
-                    free(iterator->username);
+                    storeName = iterator->username;
                     free(iterator);
                   }
                   //if in between
@@ -357,14 +357,20 @@ void * communicationThread(void * param) {
                     iterator->prev->next = iterator->next;
                     iterator->next->prev = iterator->prev;
                     close(iterator->socket);
-                    free(iterator->username);
+                    storeName = iterator->username;
                     free(iterator);
                   }
-                  //need to send UOFF to the other users
+                  //need to send UOFF to the other users afterwards
                   connected_user * temp = list_head;
+                  char uoffMessage[MAX_INPUT] = {0};
+                  strcpy(uoffMessage, "UOFF ");
+                  strcat(uoffMessage, storeName);
+                  strcat(uoffMessage, " \r\n\r\n");
                   while (temp != NULL) {
-
+                    send(temp->socket, uoffMessage, strlen(uoffMessage), 0);
+                    temp = temp->next;
                   }
+                  free(storeName);
                   write(commPipe[1], "a", 1);
                 }
                 else if (strcmp(input, "TIME") == 0) {
@@ -443,9 +449,50 @@ void * communicationThread(void * param) {
                 }
               }
             }
-            //the client either logged out or shut down
+            //the socket closed unexpectedly without BYE
             if (data == 0) {
-
+              //iterator already contains the user information
+              char uoffMessage[MAX_INPUT] = {0};
+              connected_user * temp = list_head;
+              char * storeName;
+              //still need to remove the user from the list
+              if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                list_head = NULL;
+                close(iterator->socket);
+                storeName = iterator->username;
+                free(iterator);
+                *((int *) param) = 0;
+                //if there's no user, then end the thread
+                return NULL;
+              }
+              if (iterator->prev == NULL) {
+                iterator->next->prev = NULL;
+                list_head = iterator->next;
+                close(iterator->socket);
+                storeName = iterator->username;
+                free(iterator);
+              }
+              else if (iterator->next == NULL) {
+                iterator->prev->next = NULL;
+                close(iterator->socket);
+                storeName = iterator->username;
+                free(iterator);
+              }
+              else {
+                iterator->prev->next = iterator->next;
+                iterator->next->prev = iterator->prev;
+                close(iterator->socket);
+                storeName = iterator->username;
+                free(iterator);
+              }
+              strcpy(uoffMessage, "UOFF ");
+              strcat(uoffMessage, storeName);
+              strcat(uoffMessage, " \r\n\r\n");
+              while (temp != NULL) {
+                send(temp->socket, uoffMessage, strlen(uoffMessage), 0);
+                temp = temp->next;
+              }
+              free(storeName);
             }
           }
         }
