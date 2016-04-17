@@ -343,13 +343,10 @@ bool clientCommandCheck(){
       }
       return true;
     }
-    return false;
-  }
 
-  //HANDLER FOR MSG VERB HERE, RECEIVING IT FROM SERVER
-  else if(strlen(buffer) > 3){
-    
-    char *verb = malloc(3);
+
+    verb = malloc(3);
+    memset(verb, 0, 3);
     strncpy(verb, buffer, 3);
     if(strcmp(verb, "MSG") == 0){
       char *token = malloc(MAX_INPUT);
@@ -433,9 +430,9 @@ bool clientCommandCheck(){
       free(message);
       return true;
     }
-
-
+    return false;
   }
+
   return false;
 }
 
