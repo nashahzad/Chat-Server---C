@@ -2,12 +2,13 @@
 
 int main(int argc, char *argv[]){
 	memset(buffer, 0, MAX_INPUT);
-	int fd = atoi(argv[1]);
+	int fdWrite = atoi(argv[1]);
+	int fdRead = atoi(argv[2]);
 
 	fd_set set, readSet;
 
 	FD_ZERO(&set);
-	FD_SET(fd, &set);
+	FD_SET(fdRead, &set);
 	FD_SET(0, &set);
 
 	while(1){
@@ -20,18 +21,18 @@ int main(int argc, char *argv[]){
 			removeNewline(buffer, strlen(buffer));
 
 			if(strcmp("/close", buffer) == 0){
-				close(fd);
+				close(fdRead);
+				close(fdWrite);
 				exit(EXIT_SUCCESS);
 			}
 
 			else{
-				send(fd, buffer, strlen(buffer), 0);
-				sleep(750);
+				send(fdWrite, buffer, strlen(buffer), 0);
 			}
 		}
 
-		else if(FD_ISSET(fd, &readSet)){
-			recv(fd, buffer, MAX_INPUT, 0);
+		else if(FD_ISSET(fdRead, &readSet)){
+			recv(fdRead, buffer, MAX_INPUT, 0);
 			removeNewline(buffer, strlen(buffer));
 			fprintf(stdout, ">%s\n", buffer);
 		}

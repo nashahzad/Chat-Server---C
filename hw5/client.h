@@ -21,7 +21,8 @@
 #include <sys/epoll.h>
 
 struct chat{
-	int fd;
+	int fdRead;
+	int fdWrite;
 	int PID;
 	char *name;
 	struct chat *next;
@@ -79,7 +80,7 @@ bool checkProtocol();
 
 bool clientCommandCheck();
 
-void addChat(char *name, int fd, int PID);
+void addChat(char *name, int fdRead, int fdWrite, int PID);
 
 void handleChatMessageSTDIN();
 

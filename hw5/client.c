@@ -84,10 +84,11 @@ int main(int argc, char *argv[]) {
 
     //ADD CHAT FD'S TO THE FD_SET TO MULTIPLEX ON
     for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
-      FD_SET(iterator->fd, &readSet);
+      FD_SET(iterator->fdRead, &readSet);
     }
 
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    memset(buffer, 0, MAX_INPUT);
     if(wait == -1){}
 
   else{
@@ -151,6 +152,7 @@ int main(int argc, char *argv[]) {
 
               //CHECK TO SEE IF ITS A RESPONSE TO CLIENT COMMAND FROM SERVER
               if(clientCommandCheck()){
+                memset(buffer, 0, MAX_INPUT);
                 continue;
               }
 
@@ -233,15 +235,17 @@ int main(int argc, char *argv[]) {
       //MAYBE THERE'S SOMETHING FROM CHAT FD'S
       else{
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
-          if(FD_ISSET(iterator->fd, &readSet)){
-            recv(iterator->fd, buffer, MAX_INPUT, 0);
+          if(FD_ISSET(iterator->fdRead, &readSet)){
+            recv(iterator->fdRead, buffer, MAX_INPUT, 0);
             removeNewline(buffer, strlen(buffer));
 
             //TYPED /CLOSE IN CHAT OR CLOSED XTERM WINDOW
             if(strcmp("/close", buffer) == 0 || strlen(buffer) == 0){
               kill(iterator->PID, 9);
-              close(iterator->fd);
+              close(iterator->fdRead);
+              close(iterator->fdWrite);
               removeChat(iterator);
+              memset(buffer, 0, MAX_INPUT);
               continue;
             }
 
@@ -251,6 +255,7 @@ int main(int argc, char *argv[]) {
             sprintf(message, "MSG %s %s %s \r\n\r\n", iterator->name, name, buffer);
             send(clientSocket, message, strlen(message), 0);
             free(message);
+            memset(buffer, 0, MAX_INPUT);
           }
         }
       }
@@ -345,10 +350,12 @@ bool clientCommandCheck(){
     }
 
 
-    verb = malloc(3);
-    memset(verb, 0, 3);
-    strncpy(verb, buffer, 3);
-    if(strcmp(verb, "MSG") == 0){
+    verb = "MSG\0";
+    temp = malloc(4);
+    memset(temp, 0, 4);
+    strncpy(temp, buffer, 3);
+    temp[3] = '\0';
+    if(strcmp(verb, temp) == 0){
       char *token = malloc(MAX_INPUT);
       
       memset(token, 0, MAX_INPUT);
@@ -380,47 +387,19 @@ bool clientCommandCheck(){
         strcat(message, " \0");
       }
 
+      //THIS CLIENT INITIATED CHAT
       if(strcmp(from, name) == 0){
-        //LOOKING TO SEE IF A CHAT IS ALREADY OPEN IF SO JUST WRITE TO THAT FD
+        //CHECK TO SEE IF A WINDOW IS ALREADY OPEN BY CHECKING LIST
         bool flag = false;
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
-          if(strcmp(iterator->name, to)){
-            send(iterator->fd, message, strlen(message), 0);
+          if(strcmp(iterator->name, to) == 0){
             flag = true;
             break;
           }
         }
+        //IF NOT IN LIST THEN FORK EXEC, NEED DOMAIN SOCKET
         if(!flag){
-          int chatSocket = socket(AF_UNIX, SOCK_STREAM, 0);
-          if(chatSocket == -1){
-            fprintf(stderr, "%s\n", "Unable to make UNIX domain socket!");
-          }
 
-          XTERM(offset, to, chatSocket);
-          addChat(to, chatSocket, PID);
-          send(chatSocket, message, strlen(message), 0);
-        }
-      }
-
-      else if(strcmp(to, name) == 0){
-        //LOOKING TO SEE IF A CHAT IS ALREADY OPEN IF SO JUST WRITE TO THAT FD
-        bool flag = false;
-        for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
-          if(strcmp(iterator->name, from)){
-            send(iterator->fd, message, strlen(message), 0);
-            flag = true;
-            break;
-          }
-        }
-        if(!flag){
-          int chatSocket = socket(AF_UNIX, SOCK_STREAM, 0);
-          if(chatSocket == -1){
-            fprintf(stderr, "%s\n", "Unable to make UNIX domain socket!");
-          }
-
-          XTERM(offset, from, chatSocket);
-          addChat(from, chatSocket, PID);
-          send(chatSocket, message, strlen(message), 0);
         }
       }
 
@@ -436,11 +415,12 @@ bool clientCommandCheck(){
   return false;
 }
 
-void addChat(char *name, int fd, int PID){
+void addChat(char *name, int fdRead, int fdWrite, int PID){
   if(head == NULL){
     head = malloc(sizeof(chat));
     head->name = name;
-    head->fd = fd;
+    head->fdRead = fdRead;
+    head->fdWrite = fdWrite;
     head->PID = PID;
 
     head->next = NULL;
@@ -452,7 +432,8 @@ void addChat(char *name, int fd, int PID){
 
     head = malloc(sizeof(chat));
     head->name = name;
-    head->fd = fd;
+    head->fdRead = fdRead;
+    head->fdWrite = fdWrite;
     head->PID = PID;
 
     head->next = tempHead;
