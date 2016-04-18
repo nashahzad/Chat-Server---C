@@ -208,6 +208,17 @@ int main(int argc, char *argv[]) {
           char *message = "BYE\r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
           close(clientSocket);
+          for(chat *iterator = head;;){
+            close(iterator->fd);
+            close(iterator->fdChat);
+            kill(iterator->PID, 9);
+            waitpid(iterator->PID, NULL, 0);
+            removeChat(iterator);
+            iterator = head;
+            if(iterator == NULL){
+              break;
+            }
+          }
           exit(EXIT_SUCCESS);
         }
 
@@ -238,17 +249,7 @@ int main(int argc, char *argv[]) {
           if(FD_ISSET(iterator->fd, &readSet)){
             recv(iterator->fd, buffer, MAX_INPUT, 0);
             removeNewline(buffer, strlen(buffer));
-
-            //TYPED /CLOSE IN CHAT OR CLOSED XTERM WINDOW
-            if(strcmp("/close", buffer) == 0 || strlen(buffer) == 0){
-              kill(iterator->PID, 9);
-              close(iterator->fd);
-              close(iterator->fdChat);
-              removeChat(iterator);
-              memset(buffer, 0, MAX_INPUT);
-              continue;
-            }
-
+            
             //PROBABLY JUST MESSAGE TO PERSON
             char *message = malloc(MAX_INPUT);
             memset(message, 0, MAX_INPUT);
@@ -260,7 +261,9 @@ int main(int argc, char *argv[]) {
             strcat(message, buffer);
             strcat(message, " \r\n\r\n\0");
             send(clientSocket, message, strlen(message), 0);
-            free(message);
+            free(message);          
+
+            
             memset(buffer, 0, MAX_INPUT);
           }
         }
@@ -280,8 +283,9 @@ bool checkProtocol(){
   bool flag = false;
   for(int i = 0; i < size; i++){
     if(buffer[i] == '\r' && (size - i) >= 4){
-      char *check = malloc(4);
-      memset(check, 0, 4);
+      char *check = malloc(5);
+      memset(check, 0, 5);
+      check[4] = '\0';
       strncpy(check, buffer + i, 4);
 
       if(strcmp(check, "\r\n\r\n") == 0){
@@ -355,6 +359,35 @@ bool clientCommandCheck(){
       return true;
     }
 
+    //CHECK TO SEE IF SERVER HAS SAID THAT A USER HAS LOGGED OFF
+    verb = "UOFF\0";
+    temp = malloc(5);
+    memset(temp, 0, 5);
+    strncpy(temp, buffer, 4);
+    temp[4] = '\0';
+    if(strcmp(verb, temp) == 0){
+      free(temp);
+
+      char *token = malloc(MAX_INPUT);
+      memset(token, 0, MAX_INPUT);
+      strcpy(token, buffer);
+
+      token = strtok(token, " ");
+      token = strtok(NULL, " ");
+      if(token == NULL){
+        fprintf(stderr, "%s\n", "There was no name passed with UOFF verb!");
+      }
+
+      for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
+        if(strcmp(iterator->name, token) == 0){
+          send(iterator->fd, "UOFF", 4, 0);
+          return true;
+        }
+      }
+
+      return true;
+    }
+
 
     verb = "MSG\0";
     temp = malloc(4);
@@ -399,9 +432,23 @@ bool clientCommandCheck(){
         bool flag = false;
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
           if(strcmp(iterator->name, to) == 0){
-            flag = true;
-            send(iterator->fd, message, strlen(message), 0);
-            break;
+            if(waitpid(iterator->PID, NULL, WNOHANG) != 0){
+              close(iterator->fd);
+              close(iterator->fdChat);
+              removeChat(iterator);
+              break;
+            }
+
+            else{
+              flag = true;
+              char *temp = malloc(MAX_INPUT);
+              memset(temp, 0, MAX_INPUT);
+              sprintf(temp, "<%s", message);
+              send(iterator->fd, temp, strlen(temp), 0);
+              free(temp);
+              break;
+            }
+            
           }
         }
         //IF NOT IN LIST THEN FORK EXEC, NEED DOMAIN SOCKET
@@ -410,7 +457,11 @@ bool clientCommandCheck(){
           socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
           XTERM(rand() * 1000, to, socketPair[1]);
           addChat(to, socketPair[0], socketPair[1], PID);
-          send(socketPair[0], message, strlen(message), 0);
+          char *temp = malloc(MAX_INPUT);
+          memset(temp, 0, MAX_INPUT);
+          sprintf(temp, "<%s", message);
+          send(socketPair[0], temp, strlen(temp), 0);
+          free(temp);
         }
       }
 
@@ -419,9 +470,23 @@ bool clientCommandCheck(){
         bool flag = false;
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
           if(strcmp(iterator->name, from) == 0){
-            flag = true;
-            send(iterator->fd, message, strlen(message), 0);
-            break;
+            if(waitpid(iterator->PID, NULL, WNOHANG) != 0){
+              close(iterator->fd);
+              close(iterator->fdChat);
+              removeChat(iterator);
+              break;
+            }
+
+            else{
+              flag = true;
+              char *temp = malloc(MAX_INPUT);
+              memset(temp, 0, MAX_INPUT);
+              sprintf(temp, ">%s", message);
+              send(iterator->fd, temp, strlen(temp), 0);
+              free(temp);
+              break;
+            }
+            
           }
         }
         //IF NOT IN LIST THEN FORK EXEC, NEED DOMAIN SOCKET
@@ -430,7 +495,11 @@ bool clientCommandCheck(){
           socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
           XTERM(rand() * 1000, from, socketPair[1]);
           addChat(from, socketPair[0], socketPair[1], PID);
-          send(socketPair[0], message, strlen(message), 0);
+          char *temp = malloc(MAX_INPUT);
+          memset(temp, 0, MAX_INPUT);
+          sprintf(temp, ">%s", message);
+          send(socketPair[0], temp, strlen(temp), 0);
+          free(temp);
         }
       }
 
@@ -449,8 +518,9 @@ bool clientCommandCheck(){
 void addChat(char *name, int fd, int fdChat, int PID){
   if(head == NULL){
     head = malloc(sizeof(chat));
-    head->name = malloc(strlen(name));
+    head->name = malloc(strlen(name) + 1);
     strncpy(head->name, name, strlen(name));
+    head->name[strlen(name)] = '\0';
     head->fd = fd;
     head->fdChat = fdChat;
     head->PID = PID;
@@ -463,8 +533,9 @@ void addChat(char *name, int fd, int fdChat, int PID){
     chat *tempHead = head;
 
     head = malloc(sizeof(chat));
-    head->name = malloc(strlen(name));
+    head->name = malloc(strlen(name) + 1);
     strncpy(head->name, name, strlen(name));
+    head->name[strlen(name)] = '\0';
     head->fd = fd;
     head->fdChat = fdChat;
     head->PID = PID;
@@ -523,7 +594,6 @@ void handleChatMessageSTDIN(){
 
   if(strcmp(to, name) == 0){
     free(to);
-    free(token);
     fprintf(stderr, "%s\n", "Attempting to talk to yourself?!");
     return;
   }
@@ -533,7 +603,6 @@ void handleChatMessageSTDIN(){
   //no <message>
   if(token == NULL){
     free(to);
-    free(token);
     return;
   }
 
@@ -557,7 +626,6 @@ void handleChatMessageSTDIN(){
   send(clientSocket, serverSend, strlen(serverSend), 0);
 
   free(message);
-  free(token);
   free(to);
   free(serverSend);
 
