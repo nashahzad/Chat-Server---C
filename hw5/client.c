@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 
     //ADD CHAT FD'S TO THE FD_SET TO MULTIPLEX ON
     for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
-      FD_SET(iterator->fdRead, &readSet);
+      FD_SET(iterator->fd, &readSet);
     }
 
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
@@ -235,15 +235,15 @@ int main(int argc, char *argv[]) {
       //MAYBE THERE'S SOMETHING FROM CHAT FD'S
       else{
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
-          if(FD_ISSET(iterator->fdRead, &readSet)){
-            recv(iterator->fdRead, buffer, MAX_INPUT, 0);
+          if(FD_ISSET(iterator->fd, &readSet)){
+            recv(iterator->fd, buffer, MAX_INPUT, 0);
             removeNewline(buffer, strlen(buffer));
 
             //TYPED /CLOSE IN CHAT OR CLOSED XTERM WINDOW
             if(strcmp("/close", buffer) == 0 || strlen(buffer) == 0){
               kill(iterator->PID, 9);
-              close(iterator->fdRead);
-              close(iterator->fdWrite);
+              close(iterator->fd);
+              close(iterator->fdChat);
               removeChat(iterator);
               memset(buffer, 0, MAX_INPUT);
               continue;
@@ -252,7 +252,13 @@ int main(int argc, char *argv[]) {
             //PROBABLY JUST MESSAGE TO PERSON
             char *message = malloc(MAX_INPUT);
             memset(message, 0, MAX_INPUT);
-            sprintf(message, "MSG %s %s %s \r\n\r\n", iterator->name, name, buffer);
+            strcat(message, "MSG \0");
+            strcat(message, iterator->name);
+            strcat(message, " ");
+            strcat(message, name);
+            strcat(message, " ");
+            strcat(message, buffer);
+            strcat(message, " \r\n\r\n\0");
             send(clientSocket, message, strlen(message), 0);
             free(message);
             memset(buffer, 0, MAX_INPUT);
@@ -394,12 +400,37 @@ bool clientCommandCheck(){
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
           if(strcmp(iterator->name, to) == 0){
             flag = true;
+            send(iterator->fd, message, strlen(message), 0);
             break;
           }
         }
         //IF NOT IN LIST THEN FORK EXEC, NEED DOMAIN SOCKET
         if(!flag){
+          int socketPair[2];
+          socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
+          XTERM(rand() * 1000, to, socketPair[1]);
+          addChat(to, socketPair[0], socketPair[1], PID);
+          send(socketPair[0], message, strlen(message), 0);
+        }
+      }
 
+      if(strcmp(to, name) == 0){
+        //CHECK TO SEE IF A WINDOW IS ALREADY OPEN BY CHECKING LIST
+        bool flag = false;
+        for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
+          if(strcmp(iterator->name, from) == 0){
+            flag = true;
+            send(iterator->fd, message, strlen(message), 0);
+            break;
+          }
+        }
+        //IF NOT IN LIST THEN FORK EXEC, NEED DOMAIN SOCKET
+        if(!flag){
+          int socketPair[2];
+          socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
+          XTERM(rand() * 1000, from, socketPair[1]);
+          addChat(from, socketPair[0], socketPair[1], PID);
+          send(socketPair[0], message, strlen(message), 0);
         }
       }
 
@@ -415,12 +446,13 @@ bool clientCommandCheck(){
   return false;
 }
 
-void addChat(char *name, int fdRead, int fdWrite, int PID){
+void addChat(char *name, int fd, int fdChat, int PID){
   if(head == NULL){
     head = malloc(sizeof(chat));
-    head->name = name;
-    head->fdRead = fdRead;
-    head->fdWrite = fdWrite;
+    head->name = malloc(strlen(name));
+    strncpy(head->name, name, strlen(name));
+    head->fd = fd;
+    head->fdChat = fdChat;
     head->PID = PID;
 
     head->next = NULL;
@@ -431,9 +463,10 @@ void addChat(char *name, int fdRead, int fdWrite, int PID){
     chat *tempHead = head;
 
     head = malloc(sizeof(chat));
-    head->name = name;
-    head->fdRead = fdRead;
-    head->fdWrite = fdWrite;
+    head->name = malloc(strlen(name));
+    strncpy(head->name, name, strlen(name));
+    head->fd = fd;
+    head->fdChat = fdChat;
     head->PID = PID;
 
     head->next = tempHead;
@@ -445,20 +478,24 @@ void addChat(char *name, int fdRead, int fdWrite, int PID){
 void removeChat(chat *iterator){
   if(iterator->next == NULL && iterator->prev == NULL){
     head = NULL;
+    free(iterator->name);
     free(iterator);
   }
   else if(iterator->next != NULL && iterator->prev == NULL){
     iterator->next->prev = NULL;
     head = iterator->next;
+    free(iterator->name);
     free(iterator);
   }
   else if(iterator->next == NULL && iterator->prev != NULL){
     iterator->prev->next = NULL;
+    free(iterator->name);
     free(iterator);
   }
   else{
     iterator->prev->next = iterator->next;
     iterator->next->prev = iterator->prev;
+    free(iterator->name);
     free(iterator);
   }
 }

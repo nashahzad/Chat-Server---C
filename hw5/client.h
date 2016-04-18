@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <termios.h>
-#include <errno.h>
+#include  <errno.h>
 #include <ctype.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -21,8 +21,8 @@
 #include <sys/epoll.h>
 
 struct chat{
-	int fdRead;
-	int fdWrite;
+	int fd;
+	int fdChat;
 	int PID;
 	char *name;
 	struct chat *next;
