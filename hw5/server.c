@@ -265,9 +265,17 @@ void * handleClient(void * param) {
           }
           //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
           else {
-            pthread_cancel(cid);
-            pthread_create(&cid, NULL, communicationThread, &cThread);
-            pthread_detach(cid);
+            int PID = fork();
+            if(PID == 0){
+              close(commPipe[0]);
+              write(commPipe[1], "a", 1);
+              close(commPipe[1]);
+              exit(EXIT_SUCCESS);
+            }
+            waitpid(PID, NULL, 0);
+            // pthread_cancel(cid);
+            // pthread_create(&cid, NULL, communicationThread, &cThread);
+            // pthread_detach(cid);
           }
         }
         //name already taken, send a different packet
@@ -307,12 +315,8 @@ void * communicationThread(void * param) {
     if (FD_ISSET(commPipe[0], &clientList)) {
       char stuff[3];
       read(commPipe[0], stuff, 1);
-      iterator = list_head;
-      clientList = zeroedList;
-      while (iterator != NULL) {
-        FD_SET(iterator->socket, &clientList);
-        iterator = iterator->next;
-      }
+      fprintf(stderr, "%s\n", "Scooby-Doo!");
+      continue;
     }
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
       if (FD_ISSET(iterator->socket, &clientList)) {
