@@ -19,13 +19,15 @@
 #include <pthread.h>
 #include <time.h>
 #define MAX_INPUT 1024
-#define USAGE "./server [-h|-v] PORT_NUMBER MOTD\n-h            Displays help menu & returns EXIT_SUCCESS.\n-v            Verbose print all incoming and outgoing protocol verbs and content.\nPORT_NUMBER   Port number to listen on.\nMOTD          Message to display to the client when they connect.\n"
+#define USAGE "./server [-h|-v] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n-h            Displays help menu & returns EXIT_SUCCESS.\n-v            Verbose print all incoming and outgoing protocol verbs and content.\nPORT_NUMBER   Port number to listen on.\nMOTD          Message to display to the client when they connect.\nACCOUNTS_FILE File containing user data to be loaded upon execution.\n"
 
 void * handleClient(void * param);
 void * communicationThread(void * param);
 int checkEOM(char * start);
 int checkAvailability(char * toCheck);
 int parseMSG(char * input, char ** to, char ** from);
+int verifyUser(char * user, char * pass);
+int verifyPass(char * pass);
 
 pthread_t cid;
 
