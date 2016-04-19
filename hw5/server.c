@@ -9,17 +9,27 @@ struct connected_user {
 };
 typedef struct connected_user connected_user;
 
+struct user_account {
+  char * username;
+  char * password;
+  struct user_account * next;
+  //struct user_account * prev;
+};
+typedef struct user_account user_account;
+
 connected_user * list_head = NULL;
+user_account * account_head = NULL;
 static char motd[MAX_INPUT] = {0};
 static int cThread = 0;
-static int commPipe[2];
+static int verboseFlag = 0;
+static int commandFlag = 1;
+//static int commPipe[2];
 
 int main(int argc, char *argv[]) {
-  int verboseFlag = 0;
   //first check the # of arg's to see if any flags were given
   int opt;
   int portNumber;
-  if ((argc == 4) || (argc == 5)) {
+  if ((argc == 4) || (argc == 5) || (argc == 6)) {
     while((opt = getopt(argc, argv, "hv")) != -1) {
       switch(opt) {
         case 'h':
@@ -28,7 +38,7 @@ int main(int argc, char *argv[]) {
           break;
         case 'v':
           verboseFlag = 1;
-          printf("%d", verboseFlag);
+          //printf("%d", verboseFlag);
           break;
         case '?':
         default:
@@ -39,6 +49,45 @@ int main(int argc, char *argv[]) {
     }
     portNumber = atoi(argv[optind]);
     strcpy(motd, argv[optind + 1]);
+    //is there a file to load?
+    if ((optind + 2) != argc) {
+      struct stat testFile;
+      int statTest = stat(argv[optind + 2], &testFile);
+      if (!statTest) {
+        FILE * readFile = fopen(argv[optind + 2], "r");
+        char readline[MAX_INPUT] = {0};
+        while (fgets(readline, sizeof(readline), readFile) != NULL) {
+          //remove the new line if it exists
+          char * findNewline = strchr(readline, 10);
+          if (findNewline != NULL)
+            * findNewline = '\0';
+          //now tokenize the input once to separate the username and pw
+          char * userName = strtok(readline, " ");
+          char * passWord = &readline[strlen(readline) + 1];
+          user_account * theAccount = malloc(sizeof(user_account));
+          theAccount->username = malloc(strlen(userName) + 1);
+          theAccount->password = malloc(strlen(passWord) + 1);
+          strcpy(theAccount->username, userName);
+          strcpy(theAccount->password, passWord);
+          theAccount->next = NULL;
+          if (account_head == NULL) {
+            account_head = theAccount;
+          }
+          else {
+            user_account * iterator = account_head;
+            while (iterator->next != NULL) {
+              iterator = iterator->next;
+            }
+            iterator->next = theAccount;
+          }
+          memset(readline, 0, MAX_INPUT);
+        }
+      }
+      else {
+        printf("Specified file %s does not exist.\n", argv[optind + 2]);
+        exit(EXIT_FAILURE);
+      }
+    }
   }
   else if (argc != 3) {
     printf(USAGE);
@@ -79,12 +128,12 @@ int main(int argc, char *argv[]) {
   listen(serverSocket, 20); //arbitrary queue length
   printf("Currently listening on port %d\n", portNumber);
   int counter;
-  int commandFlag = 1;
+  //int commandFlag = 1;
   //create the pipe
-  if (pipe(commPipe)) {
-    printf("Pipe failed. Quitting...\n");
-    exit(EXIT_FAILURE);
-  }
+  //if (pipe(commPipe)) {
+//    printf("Pipe failed. Quitting...\n");
+//    exit(EXIT_FAILURE);
+//  }
   //run forever until receive /shutdown
   while(1) {
     if (commandFlag)
@@ -123,8 +172,6 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
           }
           else if (strncmp("/users\n", test, 7) == 0) {
-            printf("/users test\n");
-            fflush(stdout);
             connected_user * iterator = list_head;
             while (iterator != NULL) {
               printf("%s\n", iterator->username);
@@ -132,9 +179,21 @@ int main(int argc, char *argv[]) {
               iterator = iterator->next;
             }
           }
-          else if (strncmp("/shutdown\n", test, 10) == 0) {
-            printf("/shutdown test\n");
+          else if (strncmp("/accts\n", test, 7) == 0) {
+            user_account * iterator = account_head;
+            printf("------------------------------------------------\nACCOUNTS\n");
             fflush(stdout);
+            while (iterator != NULL) {
+              printf("User: %20s      ", iterator->username);
+              fflush(stdout);
+              printf("Password: %20s\n", iterator->password);
+              fflush(stdout);
+              iterator = iterator->next;
+            }
+            printf("------------------------------------------------\n");
+            fflush(stdout);
+          }
+          else if (strncmp("/shutdown\n", test, 10) == 0) {
             connected_user * iterator = list_head;
             while (iterator != NULL) {
               connected_user * temp = iterator;
@@ -143,6 +202,12 @@ int main(int argc, char *argv[]) {
               close(temp->socket);
               free(temp->username);
               free(temp);
+            }
+            if (verboseFlag) {
+              write(1, "Sent to all users: ", 19);
+              write(1, "BYE \r\n\r\n", 8);
+              write(1, "\n", 1);
+              commandFlag = 1;
             }
             exit(EXIT_SUCCESS);
           }
@@ -202,14 +267,32 @@ void * handleClient(void * param) {
 
   //check if client started login protocol correctly
   if (recvData > 0) {
+    if (verboseFlag) {
+      write(1, "Received: ", 10);
+      write(1, input, strlen(input));
+      write(1, "\n", 1);
+      commandFlag = 1;
+    }
     if (strcmp(input, "WOLFIE\r\n\r\n") == 0) {
       send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
+      if (verboseFlag) {
+        write(1, "Sent: ", 6);
+        write(1, "EIFLOW\r\n\r\n", 10);
+        write(1, "\n", 1);
+        commandFlag = 1;
+      }
     }
   }
 
   memset(input, 0, MAX_INPUT - 1);
   recvData = recv(client, input, MAX_INPUT, 0);
   if (recvData > 0) {
+    if (verboseFlag) {
+      write(1, "Received: ", 10);
+      write(1, input, strlen(input));
+      write(1, "\n", 1);
+      commandFlag = 1;
+    }
     char check1[5] = {0};
     char check2[5] = {0};
     char name[100] = {0};
@@ -226,6 +309,12 @@ void * handleClient(void * param) {
           strcat(hiResponse, name);
           strcat(hiResponse, " \r\n\r\n");
           send(client, hiResponse, strlen(hiResponse), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, hiResponse, strlen(hiResponse));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
 
           //and send MOTD
           char sendMOTD[200] = {0};
@@ -233,6 +322,12 @@ void * handleClient(void * param) {
           strcat(sendMOTD, motd);
           strcat(sendMOTD, " \r\n\r\n");
           send(client, sendMOTD, strlen(sendMOTD), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, sendMOTD, strlen(sendMOTD));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
 
           //now add the user and his/her information to the list
           connected_user * currentlyConnected = malloc(sizeof(connected_user));
@@ -273,7 +368,19 @@ void * handleClient(void * param) {
         //name already taken, send a different packet
         else {
           send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
           send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
           close(client);
         }
       }
@@ -294,7 +401,7 @@ void * communicationThread(void * param) {
   while (list_head != NULL) {
     iterator = list_head;
     clientList = zeroedList;
-    FD_SET(commPipe[0], &clientList);
+    //FD_SET(commPipe[0], &clientList);
     while (iterator != NULL) {
       FD_SET(iterator->socket, &clientList);
       iterator = iterator->next;
@@ -304,7 +411,7 @@ void * communicationThread(void * param) {
       exit(EXIT_FAILURE);
     }
     //new connection?
-    if (FD_ISSET(commPipe[0], &clientList)) {
+    /*if (FD_ISSET(commPipe[0], &clientList)) {
       char stuff[3];
       read(commPipe[0], stuff, 1);
       iterator = list_head;
@@ -313,7 +420,7 @@ void * communicationThread(void * param) {
         FD_SET(iterator->socket, &clientList);
         iterator = iterator->next;
       }
-    }
+    }*/
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
       if (FD_ISSET(iterator->socket, &clientList)) {
           //is this socket the one with input?
@@ -321,6 +428,12 @@ void * communicationThread(void * param) {
             //since already connected, just listen for communication
             int data = recv(iterator->socket, input, MAX_INPUT, 0);
             if (data > 0) {
+              if (verboseFlag) {
+                write(1, "Received: ", 10);
+                write(1, input, strlen(input));
+                write(1, "\n", 1);
+                commandFlag = 1;
+              }
               if (checkEOM(input)) {
                 //was the response a /logout?
                 if (strcmp(input, "BYE") == 0) {
@@ -370,8 +483,14 @@ void * communicationThread(void * param) {
                     send(temp->socket, uoffMessage, strlen(uoffMessage), 0);
                     temp = temp->next;
                   }
+                  if (verboseFlag) {
+                    write(1, "Sent to all users: ", 19);
+                    write(1, uoffMessage, strlen(uoffMessage));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
                   free(storeName);
-                  write(commPipe[1], "a", 1);
+                  //write(commPipe[1], "a", 1);
                 }
                 else if (strcmp(input, "TIME") == 0) {
                   time_t now = time(NULL);
@@ -379,6 +498,12 @@ void * communicationThread(void * param) {
                   char emitMessage[50] = {0};
                   sprintf(emitMessage, "%s %d %s", "EMIT", difference, "\r\n\r\n");
                   send(iterator->socket, emitMessage, strlen(emitMessage), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, emitMessage, strlen(emitMessage));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
                 }
                 else if (strcmp(input, "LISTU") == 0) {
                   //random length (hope that the message isn't that long).
@@ -406,6 +531,12 @@ void * communicationThread(void * param) {
                   strcat(utsilMessage, " \r\n\r\n");
                   //now have the full message
                   send(iterator->socket, utsilMessage, strlen(utsilMessage), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, utsilMessage, strlen(utsilMessage));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
                   //free the pointer
                   free(utsilMessage);
                 }
@@ -431,13 +562,31 @@ void * communicationThread(void * param) {
                     //need to check if the sockets were set before sending (aka does the user actually exist)
                     //or if the user is trying to talk to themselves
                     if ((sender == 0) || (receiver == 0)) {
-                      send(sender, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
+                      send(iterator->socket, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
+                      if (verboseFlag) {
+                        write(1, "Sent: ", 6);
+                        write(1, "ERR 01 USER NOT AVAILABLE \r\n\r\n", 30);
+                        write(1, "\n", 1);
+                        commandFlag = 1;
+                      }
                     }
                     else {
                       //need to add back the \r\n\r\n
                       strcat(input, "\r\n\r\n");
                       send(sender, input, strlen(input), 0);
+                      if (verboseFlag) {
+                        write(1, "Sent: ", 6);
+                        write(1, input, strlen(input));
+                        write(1, "\n", 1);
+                        commandFlag = 1;
+                      }
                       send(receiver, input, strlen(input), 0);
+                      if (verboseFlag) {
+                        write(1, "Sent: ", 6);
+                        write(1, input, strlen(input));
+                        write(1, "\n", 1);
+                        commandFlag = 1;
+                      }
                     }
                     //free malloc space afterwards
                     free(to);
@@ -491,6 +640,12 @@ void * communicationThread(void * param) {
               while (temp != NULL) {
                 send(temp->socket, uoffMessage, strlen(uoffMessage), 0);
                 temp = temp->next;
+              }
+              if (verboseFlag) {
+                write(1, "Sent to all users: ", 19);
+                write(1, uoffMessage, strlen(uoffMessage));
+                write(1, "\n", 1);
+                commandFlag = 1;
               }
               free(storeName);
             }
