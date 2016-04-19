@@ -26,6 +26,8 @@ void * communicationThread(void * param);
 int checkEOM(char * start);
 int checkAvailability(char * toCheck);
 int parseMSG(char * input, char ** to, char ** from);
+int verifyUser(char * user, char * pass);
+int verifyPass(char * pass);
 
 pthread_t cid;
 

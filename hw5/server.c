@@ -203,6 +203,14 @@ int main(int argc, char *argv[]) {
               free(temp->username);
               free(temp);
             }
+            user_account * iterator2 = account_head;
+            while (iterator2 != NULL) {
+              user_account * temp = iterator2;
+              iterator2 = iterator2->next;
+              free(temp->username);
+              free(temp->password);
+              free(temp);
+            }
             if (verboseFlag) {
               write(1, "Sent to all users: ", 19);
               write(1, "BYE \r\n\r\n", 8);
@@ -263,6 +271,8 @@ void * handleClient(void * param) {
   //set up holding area for data
   char input[MAX_INPUT] = {0};
   int recvData;
+  int addClient = 0;
+  //int addNew = 0;
   recvData = recv(client, input, MAX_INPUT, 0);
 
   //check if client started login protocol correctly
@@ -282,9 +292,18 @@ void * handleClient(void * param) {
         commandFlag = 1;
       }
     }
+    //incorrect protocol
+    else {
+
+    }
+  }
+  //client closed unexpectedly
+  else {
+    close(client);
+    return NULL;
   }
 
-  memset(input, 0, MAX_INPUT - 1);
+  memset(input, 0, MAX_INPUT);
   recvData = recv(client, input, MAX_INPUT, 0);
   if (recvData > 0) {
     if (verboseFlag) {
@@ -293,79 +312,113 @@ void * handleClient(void * param) {
       write(1, "\n", 1);
       commandFlag = 1;
     }
-    char check1[5] = {0};
-    char check2[5] = {0};
+    char check1[10] = {0};
+    char check2[10] = {0};
     char name[100] = {0};
 
-    //check if the message is IAM <name> \r\n\r\n
+    //check if the message has \r\n\r\n
     if (checkEOM(input)) {
       int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
-      if ((strcmp(check1, "IAM") == 0) /*&& strcmp(check2, "\r\n\r\n") */&& (checkWolfieProtocol == 2)) {
+      if ((strcmp(check1, "IAM") == 0) && (checkWolfieProtocol == 2)) {
 
         //first check if the name is taken
         if (checkAvailability(name)) {
-          char hiResponse[200] = {0};
-          sprintf(hiResponse, "%s", "HI ");
-          strcat(hiResponse, name);
-          strcat(hiResponse, " \r\n\r\n");
-          send(client, hiResponse, strlen(hiResponse), 0);
-          if (verboseFlag) {
-            write(1, "Sent: ", 6);
-            write(1, hiResponse, strlen(hiResponse));
-            write(1, "\n", 1);
-            commandFlag = 1;
-          }
-
-          //and send MOTD
-          char sendMOTD[200] = {0};
-          strcpy(sendMOTD, "MOTD ");
-          strcat(sendMOTD, motd);
-          strcat(sendMOTD, " \r\n\r\n");
-          send(client, sendMOTD, strlen(sendMOTD), 0);
-          if (verboseFlag) {
-            write(1, "Sent: ", 6);
-            write(1, sendMOTD, strlen(sendMOTD));
-            write(1, "\n", 1);
-            commandFlag = 1;
-          }
-
-          //now add the user and his/her information to the list
-          connected_user * currentlyConnected = malloc(sizeof(connected_user));
-          memset(currentlyConnected, 0, sizeof(connected_user));
-          currentlyConnected->socket = client;
-          currentlyConnected->username = malloc(strlen(name) + 1);
-          strcpy(currentlyConnected->username, name);
-          //is the list empty?
-          if (list_head == NULL) {
-            currentlyConnected->prev = NULL;
-            currentlyConnected->next = NULL;
-            currentlyConnected->loginTime = time(NULL);
-            list_head = currentlyConnected;
-          }
-          //otherwise go to end and add it there
-          else {
-            connected_user * iterator = list_head;
-            while(iterator->next != NULL) {
-              iterator = iterator->next;
+          //then check if it exists in the user accounts list
+          if (verifyUser(name, NULL)) {
+            //if it does, then send AUTH
+            char authResponse[200] = {0};
+            strcpy(authResponse, "AUTH ");
+            strcat(authResponse, name);
+            strcat(authResponse, " \r\n\r\n");
+            send(client, authResponse, strlen(authResponse), 0);
+            if (verboseFlag) {
+              write(1, "Sent: ", 6);
+              write(1, authResponse, strlen(authResponse));
+              write(1, "\n", 1);
+              commandFlag = 1;
             }
-            currentlyConnected->prev = iterator;
-            currentlyConnected->next = NULL;
-            currentlyConnected->loginTime = time(NULL);
-            iterator->next = currentlyConnected;
+
+            //memset the input to recv again, since we are expecting the password next
+            memset(input, 0, MAX_INPUT);
+            recvData = recv(client, input, MAX_INPUT, 0);
+            if (recvData > 0) {
+              if (checkEOM(input)) {
+                if (strncmp(input, "PASS ", 5) == 0) {
+                  //PASS <password> \r\n\r\n
+                  //012345 < strncpy from here, but ignore the space right before the \r\n\r\n
+                  char password[200] = {0};
+                  strncpy(password, &input[5], strlen(input) - 6);
+                  if (verifyUser(name, password)) {
+                    //if pw is correct, send SSAP, HI, and MOTD
+                    send(client, "SSAP \r\n\r\n", strlen("SSAP \r\n\r\n"), 0);
+                    if (verboseFlag) {
+                      write(1, "Sent: ", 6);
+                      write(1, "SSAP \r\n\r\n", strlen("SSAP \r\n\r\n"));
+                      write(1, "\n", 1);
+                      commandFlag = 1;
+                    }
+
+                    //HI
+                    char hiResponse[200] = {0};
+                    sprintf(hiResponse, "%s", "HI ");
+                    strcat(hiResponse, name);
+                    strcat(hiResponse, " \r\n\r\n");
+                    send(client, hiResponse, strlen(hiResponse), 0);
+                    if (verboseFlag) {
+                      write(1, "Sent: ", 6);
+                      write(1, hiResponse, strlen(hiResponse));
+                      write(1, "\n", 1);
+                      commandFlag = 1;
+                    }
+
+                    //MOTD
+                    char sendMOTD[200] = {0};
+                    strcpy(sendMOTD, "MOTD ");
+                    strcat(sendMOTD, motd);
+                    strcat(sendMOTD, " \r\n\r\n");
+                    send(client, sendMOTD, strlen(sendMOTD), 0);
+                    if (verboseFlag) {
+                      write(1, "Sent: ", 6);
+                      write(1, sendMOTD, strlen(sendMOTD));
+                      write(1, "\n", 1);
+                      commandFlag = 1;
+                    }
+
+                    addClient = 1;
+                  }
+                }
+                //not correct protocol
+                else {
+
+                }
+              }
+            }
+            //client closed unexpectedly
+            else {
+              close(client);
+              return NULL;
+            }
           }
-          //then run the communication thread
-          if ((!cThread) && (list_head != NULL)) {
-            pthread_create(&cid, NULL, communicationThread, &cThread);
-            pthread_detach(cid);
-          }
-          //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
+          //name doesn't exist in the list, send ERR 01
           else {
-            pthread_cancel(cid);
-            pthread_create(&cid, NULL, communicationThread, &cThread);
-            pthread_detach(cid);
+            send(client, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
+            if (verboseFlag) {
+              write(1, "Sent: ", 6);
+              write(1, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"));
+              write(1, "\n", 1);
+              commandFlag = 1;
+            }
+            send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+            if (verboseFlag) {
+              write(1, "Sent: ", 6);
+              write(1, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"));
+              write(1, "\n", 1);
+              commandFlag = 1;
+            }
+            close(client);
           }
         }
-        //name already taken, send a different packet
+        //name already taken, send ERR 00
         else {
           send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
           if (verboseFlag) {
@@ -384,7 +437,173 @@ void * handleClient(void * param) {
           close(client);
         }
       }
+      else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
+        //does the name already exist?
+        if (verifyUser(name, NULL)) {
+
+          //send HINEW
+          char hiResponse[200] = {0};
+          sprintf(hiResponse, "%s", "HINEW ");
+          strcat(hiResponse, name);
+          strcat(hiResponse, " \r\n\r\n");
+          send(client, hiResponse, strlen(hiResponse), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, hiResponse, strlen(hiResponse));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
+
+          //wait for NEWPASS
+          memset(input, 0, MAX_INPUT);
+          recvData = recv(client, input, MAX_INPUT, 0);
+          if (recvData > 0) {
+            if (checkEOM(input)) {
+              if (strncmp(input, "NEWPASS ", 8) == 0) {
+                char password[200] = {0};
+                strncpy(password, &input[8], strlen(input) - 6);
+                if (verifyPass(password)) {
+
+                  //send SSAPWEN
+                  char * ssapwenMessage = "SSAPWEN \r\n\r\n";
+                  send(client, ssapwenMessage, strlen(ssapwenMessage), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, ssapwenMessage, strlen(ssapwenMessage));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
+
+                  //send HI
+                  char hiMessage[200] = {0};
+                  strcpy(hiMessage, "HI ");
+                  strcat(hiMessage, name);
+                  strcat(hiMessage, " \r\n\r\n");
+                  send(client, hiMessage, strlen(hiMessage), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, hiMessage, strlen(hiMessage));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
+
+                  //send MOTD
+                  char motdMessage[400] = {0};
+                  strcpy(motdMessage, "MOTD ");
+                  strcat(motdMessage, motd);
+                  strcat(motdMessage, " \r\n\r\n");
+                  send(client, motdMessage, strlen(motdMessage), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, motdMessage, strlen(motdMessage));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
+                  //finally set the addClient flag to 1
+                  addClient = 1;
+                }
+                else {
+                  //bad password, send ERR 02
+                  send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
+                  send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"));
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
+                  close(client);
+                }
+              }
+              //incorrect protocol
+              else {
+
+              }
+            }
+            //incorrect protocol
+            else {
+
+            }
+          }
+          //client closed unexpectedly
+          else {
+            close(client);
+            return NULL;
+          }
+        }
+        //if name already exists, then send ERR 00
+        else {
+          send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
+          send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+          if (verboseFlag) {
+            write(1, "Sent: ", 6);
+            write(1, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"));
+            write(1, "\n", 1);
+            commandFlag = 1;
+          }
+          close(client);
+        }
+      }
+      //incorrect protocol
+      else {
+
+      }
     }
+    //add to client list if applicable
+    if (addClient) {
+      //now add the user and his/her information to the list
+      connected_user * currentlyConnected = malloc(sizeof(connected_user));
+      memset(currentlyConnected, 0, sizeof(connected_user));
+      currentlyConnected->socket = client;
+      currentlyConnected->username = malloc(strlen(name) + 1);
+      strcpy(currentlyConnected->username, name);
+      //is the list empty?
+      if (list_head == NULL) {
+        currentlyConnected->prev = NULL;
+        currentlyConnected->next = NULL;
+        currentlyConnected->loginTime = time(NULL);
+        list_head = currentlyConnected;
+      }
+      //otherwise go to end and add it there
+      else {
+        connected_user * iterator = list_head;
+        while(iterator->next != NULL) {
+          iterator = iterator->next;
+        }
+        currentlyConnected->prev = iterator;
+        currentlyConnected->next = NULL;
+        currentlyConnected->loginTime = time(NULL);
+        iterator->next = currentlyConnected;
+      }
+      //then run the communication thread
+      if ((!cThread) && (list_head != NULL)) {
+        pthread_create(&cid, NULL, communicationThread, &cThread);
+        pthread_detach(cid);
+      }
+      //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
+      else {
+        pthread_cancel(cid);
+        pthread_create(&cid, NULL, communicationThread, &cThread);
+        pthread_detach(cid);
+      }
+    }
+  }
+  //client closed unexpectedly
+  else {
+    close(client);
+    return NULL;
   }
   return NULL;
 }
@@ -736,4 +955,49 @@ int parseMSG(char * input, char ** to, char ** from) {
     * from = fromUser;
     return 1;
   }
+}
+
+//looks for a user with name user. if its second arg is not null, it additionally verifies its password
+int verifyUser(char * user, char * pass) {
+  user_account * iterator = account_head;
+  while (iterator != NULL) {
+    if (strcmp(iterator->username, user) == 0) {
+      if (pass != NULL) {
+        if (strcmp(iterator->password, pass) == 0) {
+          return 1;
+        }
+      }
+      else {
+        return 1;
+      }
+    }
+    iterator = iterator->next;
+  }
+  return 0;
+}
+
+//makes sure a given password passes the criteria
+int verifyPass(char * pass) {
+  if (strlen(pass) < 5) {
+    return 0;
+  }
+  int upperFlag = 0;
+  int numberFlag = 0;
+  int symbolFlag = 0;
+  char iterator = * pass;
+  while (iterator != '\0') {
+    if ((iterator >= 'A') && (iterator <= 'Z')) {
+      upperFlag = 1;
+    }
+    if ((iterator >= '0') && (iterator <= '9')) {
+      numberFlag = 1;
+    }
+    if (((iterator >= '!') && (iterator <= '/')) || ((iterator >= ':') && (iterator <= '@')) || ((iterator >= '[') && (iterator <= '`')) || ((iterator >= '{') && (iterator <= '~')))
+      symbolFlag = 1;
+    iterator = * (pass++);
+  }
+  if (upperFlag && numberFlag && symbolFlag)
+    return 1;
+  else
+    return 0;
 }
