@@ -128,12 +128,12 @@ int main(int argc, char *argv[]) {
   listen(serverSocket, 20); //arbitrary queue length
   printf("Currently listening on port %d\n", portNumber);
   int counter;
-  //int commandFlag = 1;
+  int commandFlag = 1;
   //create the pipe
-  //if (pipe(commPipe)) {
-//    printf("Pipe failed. Quitting...\n");
-//    exit(EXIT_FAILURE);
-//  }
+  if (pipe(commPipe)) {
+   printf("Pipe failed. Quitting...\n");
+   exit(EXIT_FAILURE);
+ }
   //run forever until receive /shutdown
   while(1) {
     if (commandFlag)
