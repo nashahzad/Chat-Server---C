@@ -30,5 +30,6 @@ int verifyUser(char * user, char * pass);
 int verifyPass(char * pass);
 
 pthread_t cid;
+int commPipe[2];
 
 #endif

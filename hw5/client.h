@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/epoll.h>
+#include <termios.h>
 
 struct chat{
 	int fd;
@@ -68,13 +69,15 @@ chat *head = NULL;
 
 bool verboseFlag = false;
 
+int createFlag = false;
+
 char name[MAX_INPUT] = {0};
 
 int clientSocket;
 
 int offset = 10;
 
-char buffer[MAX_INPUT];
+char *buffer = NULL;
 
 bool checkProtocol();
 
@@ -87,6 +90,10 @@ void handleChatMessageSTDIN();
 void removeNewline(char *string, int length);
 
 void removeChat(chat *iterator);
+
+void loginProcedure(fd_set set, fd_set readSet);
+
+void readBuffer(int fd, bool socket);
 
 
 #endif

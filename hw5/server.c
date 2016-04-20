@@ -128,12 +128,12 @@ int main(int argc, char *argv[]) {
   listen(serverSocket, 20); //arbitrary queue length
   printf("Currently listening on port %d\n", portNumber);
   int counter;
-  //int commandFlag = 1;
+  int commandFlag = 1;
   //create the pipe
-  //if (pipe(commPipe)) {
-//    printf("Pipe failed. Quitting...\n");
-//    exit(EXIT_FAILURE);
-//  }
+  if (pipe(commPipe)) {
+   printf("Pipe failed. Quitting...\n");
+   exit(EXIT_FAILURE);
+ }
   //run forever until receive /shutdown
   while(1) {
     if (commandFlag)
@@ -534,8 +534,17 @@ void * handleClient(void * param) {
           }
           //client closed unexpectedly
           else {
-            close(client);
-            return NULL;
+            int PID = fork();
+            if(PID == 0){
+              close(commPipe[0]);
+              write(commPipe[1], "a", 1);
+              close(commPipe[1]);
+              exit(EXIT_SUCCESS);
+            }
+            waitpid(PID, NULL, 0);
+            // pthread_cancel(cid);
+            // pthread_create(&cid, NULL, communicationThread, &cThread);
+            // pthread_detach(cid);
           }
         }
         //if name already exists, then send ERR 00
@@ -651,16 +660,13 @@ void * communicationThread(void * param) {
       exit(EXIT_FAILURE);
     }
     //new connection?
-    /*if (FD_ISSET(commPipe[0], &clientList)) {
+    if (FD_ISSET(commPipe[0], &clientList)) {
       char stuff[3];
       read(commPipe[0], stuff, 1);
-      iterator = list_head;
-      clientList = zeroedList;
-      while (iterator != NULL) {
-        FD_SET(iterator->socket, &clientList);
-        iterator = iterator->next;
-      }
-    }*/
+      fprintf(stderr, "%s\n", "Scooby-Doo!");
+      continue;
+    }
+
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
       if (FD_ISSET(iterator->socket, &clientList)) {
           //is this socket the one with input?
