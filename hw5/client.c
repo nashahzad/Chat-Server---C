@@ -730,6 +730,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     }
 
     //NOW TO GET PASSWORD FROM USER AND MAKE SURE ITS VALID NEW PASSWORD
+    fprintf(stdout, "PASSWORD: ");
     struct termios oflags, nflags;
     tcgetattr(fileno(stdin), &oflags);
     nflags = oflags;
@@ -891,6 +892,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     }
 
     //NOW TO GET PASSWORD FROM USER AND JUST SEND IT TO SERVER
+    fprintf(stdout, "PASSWORD: ");
     struct termios oflags, nflags;
     tcgetattr(fileno(stdin), &oflags);
     nflags = oflags;
