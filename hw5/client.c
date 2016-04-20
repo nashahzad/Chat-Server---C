@@ -1,14 +1,12 @@
 #include "client.h"
 
 int main(int argc, char *argv[]) {
-  memset(buffer, 0, MAX_INPUT);
-  int createFlag = 0;  
   int serverPort;
   char serverIP[MAX_INPUT] = {0};
   //first check the # of arg's to see if any flags were given
   int opt;
   if ((argc == 5) || (argc == 6) || (argc == 7)) {
-    while((opt = getopt(argc, argv, "hv")) != -1) {
+    while((opt = getopt(argc, argv, "hcv")) != -1) {
       switch(opt) {
         case 'h':
           printf(USAGE);
@@ -16,11 +14,9 @@ int main(int argc, char *argv[]) {
           break;
         case 'v':
           verboseFlag = true;
-          printf("%d", verboseFlag);
           break;
         case 'c':
-          createFlag = 1;
-          printf("%d", createFlag);
+          createFlag = true;
           break;
         case '?':
         default:
@@ -75,6 +71,8 @@ int main(int argc, char *argv[]) {
   FD_ZERO(&set);
   FD_SET(clientSocket, &set);
   FD_SET(0, &set);
+
+  loginProcedure(set, readSet);
 
   int wait = 0;
   //BLOCK UNTIL THERE IS SOMETHING TO ACTUALLY READ FROM STDIN OR SERVER
@@ -638,4 +636,313 @@ void removeNewline(char *string, int length){
       string[i] = '\0';
     }
   }
+}
+
+void readBuffer(int fd, bool socket){
+  //IF READING FROM SOCKET
+  if(buffer == NULL){
+    buffer = malloc(1);
+    *buffer = '\0';
+  }
+
+  else{
+    buffer = realloc(buffer, 0);
+    buffer = malloc(1);
+    *buffer = '\0';
+  }
+
+  if(socket){
+    int size = 1;
+    char last_char[1] = {'\0'};
+    char temp_protocol[5];
+    memset(temp_protocol, 0, 5);
+    bool protocol = false;
+    for(; recv(fd, last_char, 1, 0) == 1;){
+      if(*last_char == '\r'){
+        strncpy(temp_protocol, last_char, 1);
+        if(recv(fd, last_char, 1, 0) == 1){
+          if(*last_char == '\n'){
+            strncpy(temp_protocol + 1, last_char, 1);
+            if(recv(fd, last_char, 1, 0) == 1){
+              if(*last_char == '\r'){
+                strncpy(temp_protocol + 2, last_char, 1);
+                if(recv(fd, last_char, 1, 0) == 1){
+                  if(*last_char == '\n'){
+                    strncpy(temp_protocol + 3, last_char, 1);
+                    protocol = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if(strlen(temp_protocol) > 0){
+        buffer = realloc(buffer, size + strlen(temp_protocol));
+        strncpy(buffer + size - 1, temp_protocol, strlen(temp_protocol));
+        size = size + strlen(temp_protocol);
+        memset(temp_protocol, 0, 5);
+      }
+
+      else{
+        strncpy(buffer + size - 1, last_char, 1);
+        buffer = realloc(buffer, size + 1);
+        size++;
+      }  
+    }
+    //IF PROTOCOL WAS NOT FOUND
+    if(!protocol){
+      fprintf(stderr, "Protocol was not found! Packet: %s\n", buffer);
+    }
+    //ELSE ATTACH PROTOCOL ONTO END OF BUFFER
+    else{
+      buffer = realloc(buffer, size + strlen(temp_protocol));
+      strncpy(buffer + size - 1, temp_protocol, strlen(temp_protocol));
+      size = size + strlen(temp_protocol);
+    }
+    buffer[size-1] = '\0';
+  }
+}
+
+void loginProcedure(fd_set set, fd_set readSet){
+  readSet = set;
+
+  int wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+  if(wait == -1){
+    fprintf(stderr, "%s\n", "Error on select, exiting!");
+    exit(EXIT_FAILURE);
+  }
+
+  readBuffer(clientSocket, true);
+  //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+  if(!checkProtocol()){
+    fprintf(stderr, "NO PROTOCOL ATTACHED, ABROTING LOGIN AND CLOSING CLIENT!\n");
+    close(clientSocket);
+    exit(EXIT_FAILURE);
+  }
+
+  //IF BUFFER IS LESS THAN 6 CAN'T BE EIFLOW
+  if(strlen(buffer) < 6){
+    fprintf(stderr, "Buffer less than 6, can't possibly be EIFLOW\n");
+    close(clientSocket);
+    exit(EXIT_FAILURE);
+  }
+
+  char *verb = malloc(6);
+  strncpy(verb, buffer, 6);
+  if(strcmp(verb, "EIFLOW") != 0){
+    fprintf(stderr, "Wrong verb, verb: %s\n", verb);
+    free(verb);
+    close(clientSocket);
+    exit(EXIT_FAILURE);
+  }
+
+  //PROCEDURE FOR MAKING NEW USER
+  if(createFlag){
+    char *message = malloc(2 + 6 + strlen(name) + 4 + 1);
+    memset(message, 0, 2 + 6 + strlen(name) + 4 + 1);
+
+    //SENDING OVER IAMNEW <NAME> \R\N\R\N
+    sprintf(message, "IAMNEW %s \r\n\r\n", name);
+    send(clientSocket, message, strlen(message), 0);
+
+    //WAIT FOR HINEW <NAME> \R\N\R\N
+    readSet = set;
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    free(verb);
+    verb = malloc(5 + 1 + strlen(name) + 1);
+    memset(verb, 0, 5 + 1 + strlen(name) + 1);
+    sprintf(verb, "HINEW %s", name);
+    char *temp = malloc(5 + 1 + strlen(name) + 1);
+    memset(temp, 0, 5 + 1 + strlen(name) + 1);
+    strncpy(temp, buffer, 5 + 1 + strlen(name));
+    if(strcmp(verb, temp) != 0){
+      fprintf(stderr, "Did not get correct message from server, shutting down client. Packet: %s\n", buffer);
+      close(clientSocket);
+      free(verb);
+      free(temp);
+      exit(EXIT_FAILURE);
+    }
+
+    //NOW TO GET PASSWORD FROM USER AND MAKE SURE ITS VALID NEW PASSWORD
+    struct termios oflags, nflags;
+    tcgetattr(fileno(stdin), &oflags);
+    nflags = oflags;
+    nflags.c_lflag &= ~ECHO;
+    nflags.c_lflag |= ECHONL;
+
+    tcsetattr(fileno(stdin), TCSANOW, &nflags);
+
+    char *password = malloc(MAX_INPUT);
+    memset(password, 0, MAX_INPUT);
+    fgets(password, MAX_INPUT, stdin);
+
+    tcsetattr(fileno(stdin), TCSANOW, &oflags);
+
+    removeNewline(password, strlen(password));
+
+    //NOW TO CHECK VALIDITY
+    bool upper = false, symbol = false, number = false;
+    for(int i = 0; i < strlen(password); i++){
+      if(password[i] >= 'A' && password[i] <= 'Z'){
+        upper = true;
+      }
+      else if(password[i] >= '0' && password[i] <= '9'){
+        number = true;
+      }
+      else if(!(password[i] >= 'A' && password[i] <= 'Z') && !(password[i] >= 'a' && password[i] <= 'z')
+              && !(password[i] >= '0' && password[i] <= '9')){
+        symbol = true;
+      }
+    }//END OF FOR LOOP
+
+    //IF NOT ALL TRUE, THEN SAY INVALID PASSWORD AND CLOSE
+    if(!(upper && symbol && number)){
+      fprintf(stderr, "Typed in an invalid password! Closing down client.\n");
+      close(clientSocket);
+      free(password);
+      free(message);
+      exit(EXIT_FAILURE);
+    }
+
+    free(message);
+    message = malloc(7 + 1 + strlen(password) + 1 + 4 + 1);
+    memset(message, 0, 7 + 1 + strlen(password) + 1 + 4 + 1);
+    sprintf(message, "NEWPASS %s \r\n\r\n", password);
+    send(clientSocket, message, strlen(message), 0);
+    free(message);
+    free(password);
+
+    //NEED TO CHECK FOR SSAPWEN \R\N\R\N
+    readSet = set;
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    if(strlen(buffer) < 7){
+      fprintf(stderr, "Packet sent is too small to contain SSAPWEN, closing client.\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    free(verb);
+    verb = malloc(7 + 1);
+    memset(verb, 0 , 8);
+    strncpy(verb, buffer, 7);
+    if(strcmp(verb, "SSAPWEN") != 0){
+      fprintf(stderr, "Received wrong verb from server, PACKET: %s\n", buffer);
+      free(verb);
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }    
+
+    readSet = set;
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    fprintf(stdout, "%s\n", buffer);
+
+    readSet = set;
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    //SHOULD BE PRINTING MESSAGE OF DAY NOW, DONE WITH LOGIN PROCEDURE OF NEW USER
+    fprintf(stdout, "%s\n", buffer);
+    free(verb);
+    free(message);
+    return;
+  }
+
+  //ELSE LOGGING IN AN EXISTING USER
+  else{
+    char *message = malloc(2 + 3 + strlen(name) + 4 + 1);
+    memset(message, 0, 2 + 3 + strlen(name) + 4 + 1);
+
+    //SENDING OVER IAMNEW <NAME> \R\N\R\N
+    sprintf(message, "IAM %s \r\n\r\n", name);
+    send(clientSocket, message, strlen(message), 0);
+
+    //WAIT FOR HINEW <NAME> \R\N\R\N
+    readSet = set;
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    free(verb);
+    verb = malloc(4 + 1 + strlen(name) + 1);
+    memset(verb, 0, 4 + 1 + strlen(name) + 1);
+    sprintf(verb, "AUTH %s", name);
+    char *temp = malloc(4 + 1 + strlen(name) + 1);
+    memset(temp, 0, 4 + 1 + strlen(name) + 1);
+    strncpy(temp, buffer, 4 + 1 + strlen(name));
+    if(strcmp(verb, temp) != 0){
+      fprintf(stderr, "Did not get correct message from server, shutting down client. Packet: %s\n", buffer);
+      close(clientSocket);
+      free(verb);
+      free(temp);
+      exit(EXIT_FAILURE);
+    }
+
+    
+
+  }
+
+
 }
