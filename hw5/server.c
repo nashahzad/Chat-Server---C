@@ -272,7 +272,7 @@ void * handleClient(void * param) {
   char input[MAX_INPUT] = {0};
   int recvData;
   int addClient = 0;
-  //int addNew = 0;
+  int addNew = 0;
   recvData = recv(client, input, MAX_INPUT, 0);
 
   //check if client started login protocol correctly
@@ -315,6 +315,7 @@ void * handleClient(void * param) {
     char check1[10] = {0};
     char check2[10] = {0};
     char name[100] = {0};
+    char password[200] = {0};
 
     //check if the message has \r\n\r\n
     if (checkEOM(input)) {
@@ -346,7 +347,6 @@ void * handleClient(void * param) {
                 if (strncmp(input, "PASS ", 5) == 0) {
                   //PASS <password> \r\n\r\n
                   //012345 < strncpy from here, but ignore the space right before the \r\n\r\n
-                  char password[200] = {0};
                   strncpy(password, &input[5], strlen(input) - 6);
                   if (verifyUser(name, password)) {
                     //if pw is correct, send SSAP, HI, and MOTD
@@ -499,8 +499,9 @@ void * handleClient(void * param) {
                     write(1, "\n", 1);
                     commandFlag = 1;
                   }
-                  //finally set the addClient flag to 1
+                  //finally set the addClient as wellas addNew (since new account) flag to 1
                   addClient = 1;
+                  addNew = 1;
                 }
                 else {
                   //bad password, send ERR 02
@@ -559,6 +560,26 @@ void * handleClient(void * param) {
       //incorrect protocol
       else {
 
+      }
+    }
+    //add to accounts list if applicable
+    if (addNew) {
+      user_account * newAccount = malloc(sizeof(user_account));
+      memset(newAccount, 0, sizeof(user_account));
+      newAccount->username = malloc(strlen(name) + 1);
+      strcpy(newAccount->username, name);
+      newAccount->password = malloc(strlen(password) + 1);
+      strcpy(newAccount->password, password);
+      newAccount->next = NULL;
+      if (account_head == NULL) {
+        account_head = newAccount;
+      }
+      else {
+        user_account * iterator = account_head;
+        while (iterator->next != NULL) {
+          iterator = iterator->next;
+        }
+        iterator->next = newAccount;
       }
     }
     //add to client list if applicable
