@@ -439,7 +439,7 @@ void * handleClient(void * param) {
       }
       else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
         //does the name already exist?
-        if (verifyUser(name, NULL)) {
+        if (!(verifyUser(name, NULL))) {
 
           //send HINEW
           char hiResponse[200] = {0};
