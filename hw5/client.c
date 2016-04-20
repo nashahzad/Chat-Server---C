@@ -86,13 +86,12 @@ int main(int argc, char *argv[]) {
     }
 
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
-    memset(buffer, 0, MAX_INPUT);
     if(wait == -1){}
 
   else{
 
       if(FD_ISSET(clientSocket, &readSet)) {
-          recv(clientSocket, buffer, MAX_INPUT, 0);
+          readBuffer(clientSocket, true);
 
         //IF SOMEONE CTRL-C THE SERVER JUST SHUTDOWN
         if(buffer[0] == '\0'){
@@ -107,92 +106,36 @@ int main(int argc, char *argv[]) {
           }
         }
 
-        if(verboseFlag){
-          fprintf(stderr, "received from server: %s\n", buffer);
-        }
-        //PART OF LOGIN PROCEDURE SEND BACK TO SERVER IAM <NAME>\r\n\r\n
-        if(strcmp(buffer, "EIFLOW\r\n\r\n") == 0){
-          if(verboseFlag){
-            fprintf(stdout, "%s\n", buffer);
-          }
-          char *message = malloc(9 + strlen(name));
-          memset(message, 0, 9 + strlen(name));
-          strcat(message, "IAM ");
-          strcat(message, name);
-          strcat(message, " \r\n\r\n");
-          send(clientSocket, message, strlen(message), 0);
-
-          if(verboseFlag){
-            fprintf(stderr, "sending to server: %s\n", message);
-          }
-          free(message);
+        if(!checkProtocol()){
+          fprintf(stderr, "\nBAD PACKET: %s\n", buffer);
         }
 
-        else{
-          if(!checkProtocol()){
-            fprintf(stderr, "\nBAD PACKET: %s\n", buffer);
-          }
-
-          else{
-            char *login = malloc(4 + strlen(name));
-            memset(login, 0, 3 + strlen(name));
-            strcat(login, "HI ");
-            strcat(login, name);
-            strcat(login, " ");
-
-            //SECOND PART TO LOGIN PROCEDURE SERVER SAYS HI
-            if(strcmp(buffer, login) == 0){
-              fprintf(stdout, "%s\n", buffer);
-            }
-
-            //NOT PART OF LOGIN PROCESS
-            else{
-
-              //CHECK TO SEE IF ITS A RESPONSE TO CLIENT COMMAND FROM SERVER
-              if(clientCommandCheck()){
-                memset(buffer, 0, MAX_INPUT);
-                continue;
-              }
-
-              //CHECK TO SEE IF SERVER SAID THAT USER NAME WAS ALREADY TAKEN
-              char *error = malloc(strlen("ERR 00 USER NAME TAKEN "));
-              memset(error, 0, strlen("ERR 00 USER NAME TAKEN "));
-              strcat(error, "ERR 00 USER NAME TAKEN ");
-              if(strcmp(buffer, error) == 0){
-                fprintf(stderr, "%s\n", "Username already taken, due to this error will now be closing the client.");
-                close(clientSocket);
-                free(error);
-                exit(EXIT_FAILURE);
-              }
-              free(error);
-
-              //CHECK TO SEE IF THE SERVER SHUTDOWN AND SENT BYE
-              error = malloc(strlen("BYE "));
-              memset(error, 0, strlen("BYE "));
-              strcat(error, "BYE ");
-              if(strcmp(buffer, error) == 0){
-                fprintf(stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
-                close(clientSocket);
-                free(error);
-                exit(EXIT_SUCCESS);
-              }
-              free(error);
-              fprintf(stdout, "%s\n", buffer);
-            }
-
-            free(login);
-          }
+        //CHECK TO SEE IF ITS A RESPONSE TO CLIENT COMMAND FROM SERVER
+        if(clientCommandCheck()){
+          memset(buffer, 0, MAX_INPUT);
+          continue;
         }
-        //JUST TO MAKE SURE TO THAT BUFFER GETS SET BACK TO ALL NULL TERMINATORS
-        memset(buffer, 0, MAX_INPUT);
+
+        //CHECK TO SEE IF THE SERVER SHUTDOWN AND SENT BYE
+        char *error = malloc(strlen("BYE "));
+        memset(error, 0, strlen("BYE "));
+        strcat(error, "BYE ");
+        if(strcmp(buffer, error) == 0){
+          fprintf(stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
+          close(clientSocket);
+          free(error);
+          exit(EXIT_SUCCESS);
+        }
+        free(error);
+        fprintf(stdout, "%s\n", buffer);
       }
 
       //ELSE IF IS THERE SOMETHING ON STDIN
       else if (FD_ISSET(0, &readSet)) {
-        fgets(buffer, MAX_INPUT - 1, stdin);
+        readBuffer(0, false);
         fflush(stdin);
         fflush(stdout);
-        removeNewline(buffer, MAX_INPUT);
+        removeNewline(buffer, strlen(buffer));
 
         if(verboseFlag){
           fprintf(stderr, "received from stdin: %s\n", buffer);
@@ -237,15 +180,13 @@ int main(int argc, char *argv[]) {
           handleChatMessageSTDIN();
         }
         free(comp);
-
-        memset(buffer, 0, MAX_INPUT);
       }
 
       //MAYBE THERE'S SOMETHING FROM CHAT FD'S
       else{
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
           if(FD_ISSET(iterator->fd, &readSet)){
-            recv(iterator->fd, buffer, MAX_INPUT, 0);
+            readBuffer(iterator->fd, false);
             removeNewline(buffer, strlen(buffer));
             
             //PROBABLY JUST MESSAGE TO PERSON
@@ -260,9 +201,6 @@ int main(int argc, char *argv[]) {
             strcat(message, " \r\n\r\n\0");
             send(clientSocket, message, strlen(message), 0);
             free(message);          
-
-            
-            memset(buffer, 0, MAX_INPUT);
           }
         }
       }
@@ -704,6 +642,18 @@ void readBuffer(int fd, bool socket){
     }
     buffer[size-1] = '\0';
   }
+
+  //COULD BE SOMETHING LIKE STDIN OR CHAT FD WITH NO PROTOCOL
+  else{
+    int size = 1;
+    char last_char[1] = {'\0'};
+    for(;read(fd, last_char, 1) == 1;){
+      strncpy(buffer + size - 1, last_char, 1);
+      buffer = realloc(buffer, size + 1);
+      size++;
+    }
+    buffer[size-1] = '\0';
+  }
 }
 
 void loginProcedure(fd_set set, fd_set readSet){
@@ -940,8 +890,106 @@ void loginProcedure(fd_set set, fd_set readSet){
       exit(EXIT_FAILURE);
     }
 
-    
+    //NOW TO GET PASSWORD FROM USER AND JUST SEND IT TO SERVER
+    struct termios oflags, nflags;
+    tcgetattr(fileno(stdin), &oflags);
+    nflags = oflags;
+    nflags.c_lflag &= ~ECHO;
+    nflags.c_lflag |= ECHONL;
 
+    tcsetattr(fileno(stdin), TCSANOW, &nflags);
+
+    char *password = malloc(MAX_INPUT);
+    memset(password, 0, MAX_INPUT);
+    fgets(password, MAX_INPUT, stdin);
+
+    tcsetattr(fileno(stdin), TCSANOW, &oflags);
+
+    removeNewline(password, strlen(password));
+
+    free(message);
+    message = malloc(4 + 1 + strlen(password) + 4 + 1);
+    memset(message, 0, 10 + strlen(password));
+    sprintf(message, "PASS %s \r\n\r\n", password);
+    free(password);
+
+    //NOW WAIT FOR SERVER RESPONSE AGAIN
+    readSet = set;
+
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    if(strlen(buffer) < 4){
+      fprintf(stderr, "Message sent from server too small to be right message\n");
+      close(clientSocket);
+      free(message);
+      exit(EXIT_FAILURE);
+    }
+
+    free(verb);
+    verb = malloc(5);
+    memset(verb, 0, 5);
+    if(strcmp(verb, "SSAP") != 0){
+      fprintf(stderr, "Invalid verb sent or error sent, closing down client!\n");
+      free(verb);
+      free(message);
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    //NOW WAIT FOR SERVER RESPONSE AGAIN
+    readSet = set;
+
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    fprintf(stdout, "%s\n", buffer);
+
+    //NOW WAIT FOR SERVER RESPONSE AGAIN
+    readSet = set;
+
+    wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
+    if(wait == -1){
+      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      exit(EXIT_FAILURE);
+    }
+
+    readBuffer(clientSocket, true);
+    //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
+    if(!checkProtocol()){
+      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      close(clientSocket);
+      exit(EXIT_FAILURE);
+    }
+
+    fprintf(stdout, "%s\n", buffer);
+
+    //DONE WITH LOGIN PROCESS OF EXISTING USER
+    free(verb);
+    free(message);
+    return;
   }
 
 
