@@ -1,5 +1,9 @@
 #include "chat.h"
-#include <ncurses.h>
+
+#define GREEN "\x1B[1;32m"
+#define BLUE "\x1B[1;36m"
+#define RED "\x1B[1;31m"
+#define NORMAL "\x1B[0m"
 
 int main(int argc, char *argv[]){
 	memset(buffer, 0, MAX_INPUT);
@@ -43,13 +47,22 @@ int main(int argc, char *argv[]){
 			if(strcmp(buffer, "UOFF") == 0){
 				FD_ZERO(&set);
 				FD_SET(fd, &set);
-				fprintf(stdout, "Receive %s: User had logged off or disconnect.\n", buffer);
+				fprintf(stdout, "%sReceive %s: User had logged off or disconnect.%s\n", RED, buffer, NORMAL);
 				read(0, buffer, 1);
 				exit(EXIT_SUCCESS);
 			}
 
 			else{
-				fprintf(stdout, "%s\n", buffer);
+				if(buffer[0] == '>'){
+					fprintf(stdout, "%s%s%s\n", GREEN, buffer, NORMAL);
+				}
+				else if(buffer[0] == '<'){
+					fprintf(stdout, "%s%s%s\n", BLUE, buffer, NORMAL);
+				}
+				else{
+					fprintf(stdout, "%s%s%s\n", RED, buffer, NORMAL);
+				}
+				
 			}
 			
 		}

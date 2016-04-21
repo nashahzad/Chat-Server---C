@@ -348,6 +348,7 @@ bool clientCommandCheck(){
         free(to);
         free(token);
         fprintf(stderr, "%s\n", "Messaging yourself?!");
+        fprintf(stdout, "\n>");
       }
 
       token = strtok(NULL, " ");
