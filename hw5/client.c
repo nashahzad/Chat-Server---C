@@ -918,6 +918,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     message = malloc(4 + 1 + strlen(password) + 4 + 1);
     memset(message, 0, 10 + strlen(password));
     sprintf(message, "PASS %s \r\n\r\n", password);
+    send(clientSocket, message, strlen(message), 0);
     free(password);
     free(message);
 
@@ -947,10 +948,10 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     verb = malloc(5);
     memset(verb, 0, 5);
+    strncpy(verb, buffer, 4);
     if(strcmp(verb, "SSAP") != 0){
       fprintf(stderr, "Invalid verb sent or error sent, closing down client!\n");
       free(verb);
-      free(message);
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
