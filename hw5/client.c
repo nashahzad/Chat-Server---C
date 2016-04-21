@@ -112,7 +112,6 @@ int main(int argc, char *argv[]) {
 
         //CHECK TO SEE IF ITS A RESPONSE TO CLIENT COMMAND FROM SERVER
         if(clientCommandCheck()){
-          memset(buffer, 0, MAX_INPUT);
           continue;
         }
 
@@ -133,8 +132,6 @@ int main(int argc, char *argv[]) {
       //ELSE IF IS THERE SOMETHING ON STDIN
       else if (FD_ISSET(0, &readSet)) {
         readBuffer(0, false);
-        fflush(stdin);
-        fflush(stdout);
         removeNewline(buffer, strlen(buffer));
 
         if(verboseFlag){
@@ -149,7 +146,7 @@ int main(int argc, char *argv[]) {
           char *message = "BYE\r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
           close(clientSocket);
-          for(chat *iterator = head;;){
+          for(chat *iterator = head; iterator != NULL;){
             close(iterator->fd);
             close(iterator->fdChat);
             kill(iterator->PID, 9);
@@ -513,8 +510,8 @@ void handleChatMessageSTDIN(){
     return;
   }
 
-  char *token = malloc(MAX_INPUT);
-  memset(token, 0, MAX_INPUT);
+  char *token = malloc(strlen(buffer));
+  memset(token, 0, strlen(buffer));
   strcpy(token, buffer);
 
   token = strtok(token, " ");
@@ -580,6 +577,12 @@ void readBuffer(int fd, bool socket){
   //IF READING FROM SOCKET
   if(buffer == NULL){
     buffer = malloc(1);
+    *buffer = '\0';
+  }
+
+  else if(buffer[0] == '\0'){
+    char *s = malloc(1);
+    buffer = s;
     *buffer = '\0';
   }
 
@@ -651,6 +654,9 @@ void readBuffer(int fd, bool socket){
       strncpy(buffer + size - 1, last_char, 1);
       buffer = realloc(buffer, size + 1);
       size++;
+      if(*last_char == '\n'){
+        break;
+      }
     }
     buffer[size-1] = '\0';
   }
@@ -688,6 +694,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     close(clientSocket);
     exit(EXIT_FAILURE);
   }
+  free(verb);
 
   //PROCEDURE FOR MAKING NEW USER
   if(createFlag){
@@ -697,6 +704,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     //SENDING OVER IAMNEW <NAME> \R\N\R\N
     sprintf(message, "IAMNEW %s \r\n\r\n", name);
     send(clientSocket, message, strlen(message), 0);
+    free(message);
 
     //WAIT FOR HINEW <NAME> \R\N\R\N
     readSet = set;
@@ -714,7 +722,6 @@ void loginProcedure(fd_set set, fd_set readSet){
       exit(EXIT_FAILURE);
     }
 
-    free(verb);
     verb = malloc(5 + 1 + strlen(name) + 1);
     memset(verb, 0, 5 + 1 + strlen(name) + 1);
     sprintf(verb, "HINEW %s", name);
@@ -728,6 +735,8 @@ void loginProcedure(fd_set set, fd_set readSet){
       free(temp);
       exit(EXIT_FAILURE);
     }
+    free(verb);
+    free(temp);
 
     //NOW TO GET PASSWORD FROM USER AND MAKE SURE ITS VALID NEW PASSWORD
     fprintf(stdout, "PASSWORD: ");
@@ -767,11 +776,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       fprintf(stderr, "Typed in an invalid password! Closing down client.\n");
       close(clientSocket);
       free(password);
-      free(message);
       exit(EXIT_FAILURE);
     }
 
-    free(message);
     message = malloc(7 + 1 + strlen(password) + 1 + 4 + 1);
     memset(message, 0, 7 + 1 + strlen(password) + 1 + 4 + 1);
     sprintf(message, "NEWPASS %s \r\n\r\n", password);
@@ -801,7 +808,6 @@ void loginProcedure(fd_set set, fd_set readSet){
       exit(EXIT_FAILURE);
     }
 
-    free(verb);
     verb = malloc(7 + 1);
     memset(verb, 0 , 8);
     strncpy(verb, buffer, 7);
@@ -810,7 +816,8 @@ void loginProcedure(fd_set set, fd_set readSet){
       free(verb);
       close(clientSocket);
       exit(EXIT_FAILURE);
-    }    
+    }  
+    free(verb);  
 
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
@@ -846,8 +853,6 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     //SHOULD BE PRINTING MESSAGE OF DAY NOW, DONE WITH LOGIN PROCEDURE OF NEW USER
     fprintf(stdout, "%s\n", buffer);
-    free(verb);
-    free(message);
     return;
   }
 
@@ -859,6 +864,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     //SENDING OVER IAMNEW <NAME> \R\N\R\N
     sprintf(message, "IAM %s \r\n\r\n", name);
     send(clientSocket, message, strlen(message), 0);
+    free(message);
 
     //WAIT FOR HINEW <NAME> \R\N\R\N
     readSet = set;
@@ -876,7 +882,6 @@ void loginProcedure(fd_set set, fd_set readSet){
       exit(EXIT_FAILURE);
     }
 
-    free(verb);
     verb = malloc(4 + 1 + strlen(name) + 1);
     memset(verb, 0, 4 + 1 + strlen(name) + 1);
     sprintf(verb, "AUTH %s", name);
@@ -890,6 +895,7 @@ void loginProcedure(fd_set set, fd_set readSet){
       free(temp);
       exit(EXIT_FAILURE);
     }
+    free(verb);
 
     //NOW TO GET PASSWORD FROM USER AND JUST SEND IT TO SERVER
     fprintf(stdout, "PASSWORD: ");
@@ -909,11 +915,11 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     removeNewline(password, strlen(password));
 
-    free(message);
     message = malloc(4 + 1 + strlen(password) + 4 + 1);
     memset(message, 0, 10 + strlen(password));
     sprintf(message, "PASS %s \r\n\r\n", password);
     free(password);
+    free(message);
 
     //NOW WAIT FOR SERVER RESPONSE AGAIN
     readSet = set;
@@ -939,7 +945,6 @@ void loginProcedure(fd_set set, fd_set readSet){
       exit(EXIT_FAILURE);
     }
 
-    free(verb);
     verb = malloc(5);
     memset(verb, 0, 5);
     if(strcmp(verb, "SSAP") != 0){
@@ -949,6 +954,7 @@ void loginProcedure(fd_set set, fd_set readSet){
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
+    free(verb);
 
     //NOW WAIT FOR SERVER RESPONSE AGAIN
     readSet = set;
@@ -989,8 +995,6 @@ void loginProcedure(fd_set set, fd_set readSet){
     fprintf(stdout, "%s\n", buffer);
 
     //DONE WITH LOGIN PROCESS OF EXISTING USER
-    free(verb);
-    free(message);
     return;
   }
 

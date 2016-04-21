@@ -21,7 +21,6 @@ int main(int argc, char *argv[]){
 
 		if(FD_ISSET(0, &readSet)){
 			fgets(buffer, MAX_INPUT, stdin);
-			removeNewline(buffer, strlen(buffer));
 
 			write(0, "\033[1A", 4);
 			write(0, "\033[K", 3);
