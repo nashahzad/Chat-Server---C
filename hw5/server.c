@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
           }
           memset(readline, 0, MAX_INPUT);
         }
+        fclose(readFile);
       }
       else {
         printf("Specified file %s does not exist.\n", argv[optind + 2]);
@@ -203,14 +204,24 @@ int main(int argc, char *argv[]) {
               free(temp->username);
               free(temp);
             }
+            //the server should save the user accounts in case someone created a new account
             user_account * iterator2 = account_head;
+            FILE * writeToFile;
+            if ((optind + 2) != argc) {
+              writeToFile = fopen(argv[optind + 2], "w");
+            }
+            else {
+              writeToFile = fopen("accts.txt", "w");
+            }
             while (iterator2 != NULL) {
+              fprintf(writeToFile, "%s %s\n", iterator2->username, iterator2->password);
               user_account * temp = iterator2;
               iterator2 = iterator2->next;
               free(temp->username);
               free(temp->password);
               free(temp);
             }
+            fclose(writeToFile);
             if (verboseFlag) {
               write(1, "Sent to all users: ", 19);
               write(1, "BYE \r\n\r\n", 8);
@@ -294,7 +305,13 @@ void * handleClient(void * param) {
     }
     //incorrect protocol
     else {
-
+      send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+      if (verboseFlag) {
+        write(1, "Sent: ", 6);
+        write(1, "BYE\r\n\r\n", 7);
+        write(1, "\n", 1);
+        commandFlag = 1;
+      }
     }
   }
   //client closed unexpectedly
@@ -389,7 +406,13 @@ void * handleClient(void * param) {
                 }
                 //not correct protocol
                 else {
-
+                  send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+                  if (verboseFlag) {
+                    write(1, "Sent: ", 6);
+                    write(1, "BYE\r\n\r\n", 7);
+                    write(1, "\n", 1);
+                    commandFlag = 1;
+                  }
                 }
               }
             }
@@ -458,6 +481,12 @@ void * handleClient(void * param) {
           memset(input, 0, MAX_INPUT);
           recvData = recv(client, input, MAX_INPUT, 0);
           if (recvData > 0) {
+            if (verboseFlag) {
+              write(1, "Received: ", 10);
+              write(1, input, strlen(input));
+              write(1, "\n", 1);
+              commandFlag = 1;
+            }
             if (checkEOM(input)) {
               if (strncmp(input, "NEWPASS ", 8) == 0) {
                 char password[200] = {0};
@@ -524,12 +553,24 @@ void * handleClient(void * param) {
               }
               //incorrect protocol
               else {
-
+                send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+                if (verboseFlag) {
+                  write(1, "Sent: ", 6);
+                  write(1, "BYE\r\n\r\n", 7);
+                  write(1, "\n", 1);
+                  commandFlag = 1;
+                }
               }
             }
             //incorrect protocol
             else {
-
+              send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+              if (verboseFlag) {
+                write(1, "Sent: ", 6);
+                write(1, "BYE\r\n\r\n", 7);
+                write(1, "\n", 1);
+                commandFlag = 1;
+              }
             }
           }
           //client closed unexpectedly
@@ -568,7 +609,13 @@ void * handleClient(void * param) {
       }
       //incorrect protocol
       else {
-
+        send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+        if (verboseFlag) {
+          write(1, "Sent: ", 6);
+          write(1, "BYE\r\n\r\n", 7);
+          write(1, "\n", 1);
+          commandFlag = 1;
+        }
       }
     }
     //add to accounts list if applicable
