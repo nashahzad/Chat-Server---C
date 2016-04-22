@@ -11,9 +11,10 @@ typedef struct connected_user connected_user;
 
 struct user_account {
   char * username;
-  char * password;
+  //char * password;
+  unsigned char * salt;
+  unsigned char * hash;
   struct user_account * next;
-  //struct user_account * prev;
 };
 typedef struct user_account user_account;
 
@@ -54,21 +55,22 @@ int main(int argc, char *argv[]) {
       struct stat testFile;
       int statTest = stat(argv[optind + 2], &testFile);
       if (!statTest) {
-        FILE * readFile = fopen(argv[optind + 2], "r");
-        char readline[MAX_INPUT] = {0};
-        while (fgets(readline, sizeof(readline), readFile) != NULL) {
-          //remove the new line if it exists
-          char * findNewline = strchr(readline, 10);
-          if (findNewline != NULL)
-            * findNewline = '\0';
-          //now tokenize the input once to separate the username and pw
-          char * userName = strtok(readline, " ");
-          char * passWord = &readline[strlen(readline) + 1];
+        FILE * readFile = fopen(argv[optind + 2], "rb");
+        //File will be of the form
+        //username salt(16 bytes)hash(32 bytes, immediately after salt)
+        //username, etc.
+        char * accountUsername;
+        unsigned char * accountSalt;
+        unsigned char * accountHash;
+        int readValue = readRecord(readFile, &accountUsername, &accountSalt, &accountHash);
+        while (readValue > 0) {
+          if (readValue == 2)
+            break;
           user_account * theAccount = malloc(sizeof(user_account));
-          theAccount->username = malloc(strlen(userName) + 1);
-          theAccount->password = malloc(strlen(passWord) + 1);
-          strcpy(theAccount->username, userName);
-          strcpy(theAccount->password, passWord);
+          theAccount->username = accountUsername;
+          //theAccount->password = malloc(strlen(passWord) + 1);
+          theAccount->salt = accountSalt;
+          theAccount->hash = accountHash;
           theAccount->next = NULL;
           if (account_head == NULL) {
             account_head = theAccount;
@@ -80,7 +82,7 @@ int main(int argc, char *argv[]) {
             }
             iterator->next = theAccount;
           }
-          memset(readline, 0, MAX_INPUT);
+          readValue = readRecord(readFile, &accountUsername, &accountSalt, &accountHash);
         }
         fclose(readFile);
       }
@@ -169,7 +171,7 @@ int main(int argc, char *argv[]) {
           char test[MAX_INPUT] = {0};
           fgets(test, MAX_INPUT - 1, stdin);
           if (strncmp("/help\n", test, 6) == 0) {
-            printf("--------------------------------------\nCOMMAND LIST\n/users          Prints list of current users\n/help           Prints this prompt\n/shutdown       Shuts down server\n--------------------------------------\n");
+            printf("--------------------------------------\nCOMMAND LIST\n/accts          Prints list of user accounts\n/users          Prints list of current users\n/help           Prints this prompt\n/shutdown       Shuts down server\n--------------------------------------\n");
             fflush(stdout);
           }
           else if (strncmp("/users\n", test, 7) == 0) {
@@ -185,9 +187,20 @@ int main(int argc, char *argv[]) {
             printf("------------------------------------------------\nACCOUNTS\n");
             fflush(stdout);
             while (iterator != NULL) {
-              printf("User: %20s      ", iterator->username);
+              printf("User: %12s      ", iterator->username);
               fflush(stdout);
-              printf("Password: %20s\n", iterator->password);
+              printf("Salt: ");
+              int i;
+              for(i = 0; i < SALT_LENGTH; i++) {
+                printf("%02x", iterator->salt[i]);
+              }
+              printf(" ");
+              fflush(stdout);
+              printf("Hash: ");
+              for(i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+                printf("%02x", iterator->hash[i]);
+              }
+              printf("\n");
               fflush(stdout);
               iterator = iterator->next;
             }
@@ -208,17 +221,22 @@ int main(int argc, char *argv[]) {
             user_account * iterator2 = account_head;
             FILE * writeToFile;
             if ((optind + 2) != argc) {
-              writeToFile = fopen(argv[optind + 2], "w");
+              writeToFile = fopen(argv[optind + 2], "wb");
             }
             else {
-              writeToFile = fopen("accts.txt", "w");
+              writeToFile = fopen("accts.txt", "wb");
             }
             while (iterator2 != NULL) {
-              fprintf(writeToFile, "%s %s\n", iterator2->username, iterator2->password);
+              fprintf(writeToFile, "%s", iterator2->username);
+              fprintf(writeToFile, " ");
+              fwrite(iterator2->salt, 16, 1, writeToFile);
+              fwrite(iterator2->hash, 32, 1, writeToFile);
+              fprintf(writeToFile, "\n");
               user_account * temp = iterator2;
               iterator2 = iterator2->next;
               free(temp->username);
-              free(temp->password);
+              free(temp->salt);
+              free(temp->hash);
               free(temp);
             }
             fclose(writeToFile);
@@ -333,6 +351,7 @@ void * handleClient(void * param) {
     char check2[10] = {0};
     char name[100] = {0};
     char password[200] = {0};
+    char newPassword[200] = {0};
 
     //check if the message has \r\n\r\n
     if (checkEOM(input)) {
@@ -365,7 +384,18 @@ void * handleClient(void * param) {
                   //PASS <password> \r\n\r\n
                   //012345 < strncpy from here, but ignore the space right before the \r\n\r\n
                   strncpy(password, &input[5], strlen(input) - 6);
-                  if (verifyUser(name, password)) {
+                  unsigned char enteredPw[SHA256_DIGEST_LENGTH];
+                  SHA256_CTX context;
+                  SHA256_Init(&context);
+                  SHA256_Update(&context, (unsigned char *) password, strlen(password));
+                  user_account * iterator = account_head;
+                  while (iterator != NULL) {
+                    if (strcmp(iterator->username, name) == 0)
+                      SHA256_Update(&context, iterator->salt, SALT_LENGTH);
+                    iterator = iterator->next;
+                  }
+                  SHA256_Final(enteredPw, &context);
+                  if (verifyUser(name, enteredPw)) {
                     //if pw is correct, send SSAP, HI, and MOTD
                     send(client, "SSAP \r\n\r\n", strlen("SSAP \r\n\r\n"), 0);
                     if (verboseFlag) {
@@ -489,9 +519,8 @@ void * handleClient(void * param) {
             }
             if (checkEOM(input)) {
               if (strncmp(input, "NEWPASS ", 8) == 0) {
-                char password[200] = {0};
-                strncpy(password, &input[8], strlen(input) - 6);
-                if (verifyPass(password)) {
+                strncpy(newPassword, &input[8], strlen(input) - 6);
+                if (verifyPass(newPassword)) {
 
                   //send SSAPWEN
                   char * ssapwenMessage = "SSAPWEN \r\n\r\n";
@@ -624,8 +653,21 @@ void * handleClient(void * param) {
       memset(newAccount, 0, sizeof(user_account));
       newAccount->username = malloc(strlen(name) + 1);
       strcpy(newAccount->username, name);
-      newAccount->password = malloc(strlen(password) + 1);
-      strcpy(newAccount->password, password);
+      newAccount->salt = malloc(SALT_LENGTH);
+      newAccount->hash = malloc(SHA256_DIGEST_LENGTH);
+      //generate the salt for the new user
+      unsigned char newSalt[SALT_LENGTH];
+      RAND_bytes(newSalt, SALT_LENGTH);
+      memcpy(newAccount->salt, newSalt, SALT_LENGTH);
+      //generate the hash for the new user
+      unsigned char newHash[SHA256_DIGEST_LENGTH];
+      SHA256_CTX context;
+      SHA256_Init(&context);
+      SHA256_Update(&context, (unsigned char * ) newPassword, strlen(newPassword));
+      SHA256_Update(&context, newSalt, SALT_LENGTH);
+      SHA256_Final(newHash, &context);
+      memcpy(newAccount->hash, newHash, SHA256_DIGEST_LENGTH);
+
       newAccount->next = NULL;
       if (account_head == NULL) {
         account_head = newAccount;
@@ -1032,12 +1074,12 @@ int parseMSG(char * input, char ** to, char ** from) {
 }
 
 //looks for a user with name user. if its second arg is not null, it additionally verifies its password
-int verifyUser(char * user, char * pass) {
+int verifyUser(char * user, unsigned char * pass) {
   user_account * iterator = account_head;
   while (iterator != NULL) {
     if (strcmp(iterator->username, user) == 0) {
       if (pass != NULL) {
-        if (strcmp(iterator->password, pass) == 0) {
+        if (memcmp(iterator->hash, pass, SHA256_DIGEST_LENGTH) == 0) {
           return 1;
         }
       }
@@ -1074,4 +1116,77 @@ int verifyPass(char * pass) {
     return 1;
   else
     return 0;
+}
+
+//the records are of the form <user> <salt><hash> (hash is immediately after salt)
+int readRecord(FILE * file, char ** username, unsigned char ** salt, unsigned char ** hash) {
+  int ret = 0;
+  unsigned char * theSalt = malloc(SALT_LENGTH);
+  unsigned char * theHash = malloc(SHA256_DIGEST_LENGTH);
+  int usernameLength = 15;
+  char * theUsername = malloc(usernameLength);
+  char currentChar;
+  int lengthCounter = 0;
+  //first read the username
+  while(fread(&currentChar, 1, 1, file) == 1) {
+    if (currentChar == ' ') {
+      break;
+    }
+    theUsername[lengthCounter++] = currentChar;
+    if (lengthCounter == usernameLength) {
+      usernameLength += 16;
+      char * temp = realloc(theUsername, usernameLength);
+      if (temp == NULL) {
+        free(theSalt);
+        free(theHash);
+        free(theUsername);
+        return 0;
+      }
+      else {
+        theUsername = temp;
+      }
+    }
+  }
+  theUsername[lengthCounter++] = '\0';
+  //now read the salt (fixed size)
+  if (fread(theSalt, 1, SALT_LENGTH, file) == 16) {
+    * salt = theSalt;
+  }
+  else {
+    ret = 3;
+  }
+  //as well as the hash (fixed size)
+  if (fread(theHash, 1, SHA256_DIGEST_LENGTH, file) == SHA256_DIGEST_LENGTH) {
+    * hash = theHash;
+  }
+  else {
+    ret = 3;
+  }
+  //since the format separates records by \n, read the \n to move the file pointer up
+  int c;
+  c = fgetc(file);
+  if (c == '\n') {
+    ret = 1;
+  }
+  else if (c == EOF) {
+    ret = 2;
+  }
+  //unexpected character
+  else {
+
+  }
+  //realloc the char * so it only uses just enough space
+  char * temp = realloc(theUsername, strlen(theUsername) + 1);
+  if (temp == NULL) {
+    free(theSalt);
+    free(theHash);
+    free(theUsername);
+    return 0;
+  }
+  else {
+    theUsername = temp;
+    * username = theUsername;
+  }
+
+  return ret;
 }

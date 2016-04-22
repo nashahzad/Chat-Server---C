@@ -1,9 +1,9 @@
-CFLAGS = -Wall -Werror -g -pthread 
+CFLAGS = -Wall -Werror -g -pthread
 
 all: server client chat
 
 server:
-	gcc $(CFLAGS) server.c -o $@ -lncurses
+	gcc $(CFLAGS) server.c -o $@ -lncurses -lssl -lcrypto
 
 client:
 	gcc $(CFLAGS) client.c -o $@ -lncurses
