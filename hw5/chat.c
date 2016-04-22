@@ -30,7 +30,7 @@ int main(int argc, char *argv[]){
 			write(0, "\033[K", 3);
 			
 
-			if(strcmp("/close", buffer) == 0){
+			if(strcmp("/close\n", buffer) == 0){
 				close(fd);
 				exit(EXIT_SUCCESS);
 			}
