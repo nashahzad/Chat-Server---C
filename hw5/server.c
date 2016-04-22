@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
         if (counter == serverSocket) {
           //accept an incoming connection
           commandFlag = 0;
-          unsigned int clientLength;
+          unsigned int clientLength = sizeof((struct sockaddr *) &clientInfo);
           int clientSocket = accept(serverSocket, (struct sockaddr *) &clientInfo, &clientLength);
           if (clientSocket == -1) {
             int errcode = errno;
@@ -379,19 +379,27 @@ void * handleClient(void * param) {
             memset(input, 0, MAX_INPUT);
             recvData = recv(client, input, MAX_INPUT, 0);
             if (recvData > 0) {
+              if (verboseFlag) {
+                write(1, "Received: ", 10);
+                write(1, input, strlen(input));
+                write(1, "\n", 1);
+                commandFlag = 1;
+              }
               if (checkEOM(input)) {
                 if (strncmp(input, "PASS ", 5) == 0) {
                   //PASS <password> \r\n\r\n
                   //012345 < strncpy from here, but ignore the space right before the \r\n\r\n
-                  strncpy(password, &input[5], strlen(input) - 6);
+                  strncpy(password, &input[5], strlen(input) - 5);
                   unsigned char enteredPw[SHA256_DIGEST_LENGTH];
                   SHA256_CTX context;
                   SHA256_Init(&context);
                   SHA256_Update(&context, (unsigned char *) password, strlen(password));
                   user_account * iterator = account_head;
                   while (iterator != NULL) {
-                    if (strcmp(iterator->username, name) == 0)
+                    if (strcmp(iterator->username, name) == 0) {
                       SHA256_Update(&context, iterator->salt, SALT_LENGTH);
+                      break;
+                    }
                     iterator = iterator->next;
                   }
                   SHA256_Final(enteredPw, &context);
@@ -432,6 +440,23 @@ void * handleClient(void * param) {
                     }
 
                     addClient = 1;
+                  }
+                  //incorrect password
+                  else {
+                    send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
+                    if (verboseFlag) {
+                      write(1, "Sent: ", 6);
+                      write(1, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"));
+                      write(1, "\n", 1);
+                      commandFlag = 1;
+                    }
+                    send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+                    if (verboseFlag) {
+                      write(1, "Sent: ", 6);
+                      write(1, "BYE\r\n\r\n", 7);
+                      write(1, "\n", 1);
+                      commandFlag = 1;
+                    }
                   }
                 }
                 //not correct protocol
@@ -519,7 +544,7 @@ void * handleClient(void * param) {
             }
             if (checkEOM(input)) {
               if (strncmp(input, "NEWPASS ", 8) == 0) {
-                strncpy(newPassword, &input[8], strlen(input) - 6);
+                strncpy(newPassword, &input[8], strlen(input) - 8);
                 if (verifyPass(newPassword)) {
 
                   //send SSAPWEN
