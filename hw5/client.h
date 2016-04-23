@@ -13,13 +13,14 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <termios.h>
-#include  <errno.h>
+#include <errno.h>
 #include <ctype.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <termios.h>
+#include <signal.h>
 
 struct chat{
 	int fd;
@@ -94,6 +95,8 @@ void removeChat(chat *iterator);
 void loginProcedure(fd_set set, fd_set readSet);
 
 void readBuffer(int fd, bool socket);
+
+void SIGINTHandler(int sig);
 
 
 #endif

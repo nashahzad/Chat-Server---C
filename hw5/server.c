@@ -852,7 +852,7 @@ void * communicationThread(void * param) {
                   free(storeName);
                   //write(commPipe[1], "a", 1);
                 }
-                else if (strcmp(input, "TIME") == 0) {
+                else if (strcmp(input, "TIME ") == 0) {
                   time_t now = time(NULL);
                   int difference = now - iterator->loginTime;
                   char emitMessage[50] = {0};
@@ -865,7 +865,7 @@ void * communicationThread(void * param) {
                     commandFlag = 1;
                   }
                 }
-                else if (strcmp(input, "LISTU") == 0) {
+                else if (strcmp(input, "LISTU ") == 0) {
                   //random length (hope that the message isn't that long).
                   int mallocSize = 101;
                   char * utsilMessage = malloc(mallocSize);

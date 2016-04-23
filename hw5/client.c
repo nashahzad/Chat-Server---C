@@ -1,6 +1,7 @@
 #include "client.h"
 
 int main(int argc, char *argv[]) {
+  signal(SIGINT, SIGINTHandler);
   int serverPort;
   char serverIP[MAX_INPUT] = {0};
   //first check the # of arg's to see if any flags were given
@@ -63,6 +64,9 @@ int main(int argc, char *argv[]) {
   }
 
   send(clientSocket, "WOLFIE\r\n\r\n", strlen("WOLFIE\r\n\r\n"), 0);
+  if(verboseFlag){
+      fprintf(stderr, "SENT TO SERVER: %s\n", "WOLFIE");
+    }
 
   //SET UP I/O MULTIPLEXING
   //int maxfd = clientSocket + 1;
@@ -143,8 +147,11 @@ int main(int argc, char *argv[]) {
         }
 
         if(strcmp("/logout", buffer) == 0){
-          char *message = "BYE\r\n\r\n\0";
+          char *message = "BYE \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
+          if(verboseFlag){
+            fprintf(stderr, "SENT TO SERVER: %s\n", "BYE");
+          }
           close(clientSocket);
           for(chat *iterator = head; iterator != NULL;){
             close(iterator->fd);
@@ -161,13 +168,19 @@ int main(int argc, char *argv[]) {
         }
 
         if(strcmp("/time", buffer) == 0){
-          char *message = "TIME\r\n\r\n\0";
+          char *message = "TIME \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
+          if(verboseFlag){
+            fprintf(stderr, "SENT TO SERVER: %s\n", "TIME");
+          }
         }
 
         if(strcmp("/listu", buffer) == 0){
-          char *message = "LISTU\r\n\r\n\0";
+          char *message = "LISTU \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
+          if(verboseFlag){
+            fprintf(stderr, "SENT TO SERVER: %s\n", "LISTU");
+          }
         }
 
         char *comp = malloc(6);
@@ -197,6 +210,13 @@ int main(int argc, char *argv[]) {
             strcat(message, buffer);
             strcat(message, " \r\n\r\n\0");
             send(clientSocket, message, strlen(message), 0);
+            if(verboseFlag){
+              char *verbose = malloc(strlen(message));
+              memset(verbose, 0, strlen(message));
+              strncpy(verbose, message, strlen(message) - 5);
+              fprintf(stderr, "SENT TO SERVER: %s\n", verbose);
+              free(verbose);
+            }
             free(message);          
           }
         }
@@ -229,6 +249,10 @@ bool checkProtocol(){
       }
       free(check);
     }
+  }
+
+  if(verboseFlag){
+      fprintf(stderr, "RECEIVED FROM SERVER: %s\n", buffer);
   }
 
   if(flag){
@@ -314,6 +338,9 @@ bool clientCommandCheck(){
       for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
         if(strcmp(iterator->name, token) == 0){
           send(iterator->fd, "UOFF", 4, 0);
+          if(verboseFlag){
+            fprintf(stderr, "SENT TO CHAT: %s\n", "UOFF");
+          }
           return true;
         }
       }
@@ -379,6 +406,9 @@ bool clientCommandCheck(){
               memset(temp, 0, MAX_INPUT);
               sprintf(temp, "<%s", message);
               send(iterator->fd, temp, strlen(temp), 0);
+              if(verboseFlag){
+                fprintf(stderr, "SENT TO CHAT: %s\n", message);
+              }
               free(temp);
               break;
             }
@@ -395,6 +425,9 @@ bool clientCommandCheck(){
           memset(temp, 0, MAX_INPUT);
           sprintf(temp, "<%s", message);
           send(socketPair[0], temp, strlen(temp), 0);
+          if(verboseFlag){
+            fprintf(stderr, "SENT TO CHAT: %s\n", message);
+          }
           free(temp);
         }
       }
@@ -417,6 +450,9 @@ bool clientCommandCheck(){
               memset(temp, 0, MAX_INPUT);
               sprintf(temp, ">%s", message);
               send(iterator->fd, temp, strlen(temp), 0);
+              if(verboseFlag){
+                fprintf(stderr, "SENT TO CHAT: %s\n", message);
+              }
               free(temp);
               break;
             }
@@ -433,6 +469,9 @@ bool clientCommandCheck(){
           memset(temp, 0, MAX_INPUT);
           sprintf(temp, ">%s", message);
           send(socketPair[0], temp, strlen(temp), 0);
+          if(verboseFlag){
+            fprintf(stderr, "SENT TO CHAT: %s\n", message);
+          }
           free(temp);
         }
       }
@@ -558,6 +597,13 @@ void handleChatMessageSTDIN(){
   strcat(serverSend, " \r\n\r\n");
 
   send(clientSocket, serverSend, strlen(serverSend), 0);
+  if(verboseFlag){
+    char *verbose = malloc(strlen(serverSend));
+    memset(verbose, 0, strlen(serverSend));
+    strncpy(verbose, serverSend, strlen(serverSend) - 5);
+    fprintf(stderr, "SENT TO SERVER: %s\n", verbose);
+    free(verbose);
+  }
 
   free(message);
   free(to);
@@ -660,6 +706,13 @@ void readBuffer(int fd, bool socket){
       }
     }
     buffer[size-1] = '\0';
+    if(verboseFlag){
+      if(fd == 0){
+        fprintf(stderr, "RECEIVED FROM STDIN: %s\n", buffer);
+      }else{
+        fprintf(stderr, "RECEIVED FROM A CHAT: %s\n", buffer);
+      }
+    }
   }
 }
 
@@ -705,6 +758,13 @@ void loginProcedure(fd_set set, fd_set readSet){
     //SENDING OVER IAMNEW <NAME> \R\N\R\N
     sprintf(message, "IAMNEW %s \r\n\r\n", name);
     send(clientSocket, message, strlen(message), 0);
+    if(verboseFlag){
+      char *verbose = malloc(strlen(message));
+      memset(verbose, 0, strlen(message));
+      strncpy(verbose, message, strlen(message) - 5);
+      fprintf(stderr, "SENT TO SERVER: %s\n", verbose);
+      free(verbose);
+    }
     free(message);
 
     //WAIT FOR HINEW <NAME> \R\N\R\N
@@ -784,6 +844,13 @@ void loginProcedure(fd_set set, fd_set readSet){
     memset(message, 0, 7 + 1 + strlen(password) + 1 + 4 + 1);
     sprintf(message, "NEWPASS %s \r\n\r\n", password);
     send(clientSocket, message, strlen(message), 0);
+    if(verboseFlag){
+      char *verbose = malloc(strlen(message));
+      memset(verbose, 0, strlen(message));
+      strncpy(verbose, message, strlen(message) - 5);
+      fprintf(stderr, "SENT TO SERVER: %s\n", verbose);
+      free(verbose);
+    }
     free(message);
     free(password);
 
@@ -865,6 +932,13 @@ void loginProcedure(fd_set set, fd_set readSet){
     //SENDING OVER IAMNEW <NAME> \R\N\R\N
     sprintf(message, "IAM %s \r\n\r\n", name);
     send(clientSocket, message, strlen(message), 0);
+    if(verboseFlag){
+      char *verbose = malloc(strlen(message));
+      memset(verbose, 0, strlen(message));
+      strncpy(verbose, message, strlen(message) - 5);
+      fprintf(stderr, "SENT TO SERVER: %s\n", verbose);
+      free(verbose);
+    }
     free(message);
 
     //WAIT FOR HINEW <NAME> \R\N\R\N
@@ -920,6 +994,13 @@ void loginProcedure(fd_set set, fd_set readSet){
     memset(message, 0, 10 + strlen(password));
     sprintf(message, "PASS %s \r\n\r\n", password);
     send(clientSocket, message, strlen(message), 0);
+    if(verboseFlag){
+      char *verbose = malloc(strlen(message));
+      memset(verbose, 0, strlen(message));
+      strncpy(verbose, message, strlen(message) - 5);
+      fprintf(stderr, "SENT TO SERVER: %s\n", verbose);
+      free(verbose);
+    }
     free(password);
     free(message);
 
@@ -1001,4 +1082,28 @@ void loginProcedure(fd_set set, fd_set readSet){
   }
 
 
+}
+
+void SIGINTHandler(int sig){
+  char *message = "BYE \r\n\r\n\0";
+  send(clientSocket, message, strlen(message), 0);
+  write(0, "\033[1A", 4);
+  write(0, "\033[K", 3);
+  write(1, "\n", 1);
+  if(verboseFlag){
+    fprintf(stderr, "SENT TO SERVER: %s\n", "BYE");
+  }
+  close(clientSocket);
+  for(chat *iterator = head; iterator != NULL;){
+    close(iterator->fd);
+    close(iterator->fdChat);
+    kill(iterator->PID, 9);
+    waitpid(iterator->PID, NULL, 0);
+    removeChat(iterator);
+    iterator = head;
+    if(iterator == NULL){
+      break;
+    }
+  }
+  exit(EXIT_SUCCESS);
 }
