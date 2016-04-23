@@ -22,6 +22,11 @@
 #include <termios.h>
 #include <signal.h>
 
+#define GREEN "\x1B[1;32m"
+#define BLUE "\x1B[1;36m"
+#define RED "\x1B[1;31m"
+#define NORMAL "\x1B[0m"
+
 struct chat{
 	int fd;
 	int fdChat;
