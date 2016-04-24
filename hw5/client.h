@@ -46,7 +46,8 @@ chat *head = NULL;
 "/time - Will ask the server for how long you have been connected.\n"\
 "/help - Will pop open help menu of of commands that you are reading right now :D\n"\
 "/logout - Will disconnect with the server.\n"\
-"/listu - It will ask the server to find out who else has been connected to server.\n\n"\
+"/listu - It will ask the server to find out who else has been connected to server.\n"\
+"/chat <person_to> <message> - If that person_to is connected to server then chat windows will open to allow conversation between you and person_to.\n\n"\
 
 #define TIME(hours, minutes, seconds) fprintf(stdout, "connected for %d hour(s), %d minute(s), and %d second(s)\n", hours, minutes, seconds);
 

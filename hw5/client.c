@@ -100,8 +100,24 @@ int main(int argc, char *argv[]) {
         //IF SOMEONE CTRL-C THE SERVER JUST SHUTDOWN
         if(buffer[0] == '\0'){
           fprintf(stderr, "Select was triggered, but nothing in socket came through.\n");
+          char *message = "BYE \r\n\r\n\0";
+          send(clientSocket, message, strlen(message), 0);
+          if(verboseFlag){
+            fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
+          }
           close(clientSocket);
-          exit(EXIT_FAILURE);
+          for(chat *iterator = head; iterator != NULL;){
+            close(iterator->fd);
+            close(iterator->fdChat);
+            kill(iterator->PID, 9);
+            waitpid(iterator->PID, NULL, 0);
+            removeChat(iterator);
+            iterator = head;
+            if(iterator == NULL){
+              break;
+            }
+          }
+          exit(EXIT_SUCCESS);
         }
 
         if(strlen(buffer) == 1){
@@ -325,8 +341,8 @@ bool clientCommandCheck(){
     if(strcmp(verb, temp) == 0){
       free(temp);
 
-      char *token = malloc(MAX_INPUT);
-      memset(token, 0, MAX_INPUT);
+      char *token = malloc(strlen(buffer));
+      memset(token, 0, strlen(buffer));
       strcpy(token, buffer);
 
       token = strtok(token, " ");
@@ -588,13 +604,7 @@ void handleChatMessageSTDIN(){
 
   char *serverSend = malloc(MAX_INPUT);
   memset(serverSend, 0, MAX_INPUT);
-  strcat(serverSend, "MSG ");
-  strcat(serverSend, to);
-  strcat(serverSend, " ");
-  strcat(serverSend, name);
-  strcat(serverSend, " ");
-  strcat(serverSend, message);
-  strcat(serverSend, " \r\n\r\n");
+  sprintf(serverSend, "MSG %s %s %s \r\n\r\n", to, name, message);
 
   send(clientSocket, serverSend, strlen(serverSend), 0);
   if(verboseFlag){
