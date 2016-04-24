@@ -107,11 +107,13 @@ int main(int argc, char *argv[]) {
   }
 
   //create socket
+  int setOption = 1;
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if (serverSocket == -1) {
     printf("Failed to make server socket. Quitting...\n");
     exit(EXIT_FAILURE);
   }
+  setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (void *) &setOption, sizeof(setOption));
 
   //then bind it to a port
   struct sockaddr_in serverInfo, clientInfo;
