@@ -26,6 +26,12 @@ int main(int argc, char *argv[]){
 		if(FD_ISSET(0, &readSet)){
 			fgets(buffer, MAX_INPUT, stdin);
 
+			//IF JUST NEW LINE AND NOTHING WRITTEN DOWN THEN JUST DO NOTHING
+			if(buffer[0] == '\n'){
+				write(0, "\033[1A", 4);
+				continue;
+			}
+
 			write(0, "\033[1A", 4);
 			write(0, "\033[K", 3);
 			

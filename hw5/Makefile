@@ -11,5 +11,8 @@ client:
 chat:
 	gcc $(CFLAGS) chat.c -o $@ -lncurses
 
+mac:
+	gcc $(CFLAGS) server.c -o server -lncurses -lssl -lcrypto -Wno-error=deprecated-declarations
+
 clean:
 	rm -f server client chat

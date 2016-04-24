@@ -141,8 +141,19 @@ int main(int argc, char *argv[]) {
         strcat(error, "BYE ");
         if(strcmp(buffer, error) == 0){
           fprintf(stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
-          close(clientSocket);
           free(error);
+          close(clientSocket);
+          for(chat *iterator = head; iterator != NULL;){
+            close(iterator->fd);
+            close(iterator->fdChat);
+            kill(iterator->PID, 9);
+            waitpid(iterator->PID, NULL, 0);
+            removeChat(iterator);
+            iterator = head;
+            if(iterator == NULL){
+              break;
+            }
+          }
           exit(EXIT_SUCCESS);
         }
         free(error);
