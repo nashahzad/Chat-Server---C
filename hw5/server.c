@@ -27,9 +27,13 @@ static int commandFlag = 1;
 //static int commPipe[2];
 
 int main(int argc, char *argv[]) {
+  //install signal handler for SIGINT
+  signal(SIGINT, handleSigInt);
   //first check the # of arg's to see if any flags were given
   int opt;
   int portNumber;
+  args = argc;
+  args2 = argv;
   if ((argc == 4) || (argc == 5) || (argc == 6)) {
     while((opt = getopt(argc, argv, "hv")) != -1) {
       switch(opt) {
@@ -103,7 +107,7 @@ int main(int argc, char *argv[]) {
   }
 
   //create socket
-  int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+  serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if (serverSocket == -1) {
     printf("Failed to make server socket. Quitting...\n");
     exit(EXIT_FAILURE);
@@ -246,6 +250,7 @@ int main(int argc, char *argv[]) {
               write(1, "\n", 1);
               commandFlag = 1;
             }
+            close(serverSocket);
             exit(EXIT_SUCCESS);
           }
           else {
@@ -1214,4 +1219,55 @@ int readRecord(FILE * file, char ** username, unsigned char ** salt, unsigned ch
   }
 
   return ret;
+}
+
+void handleSigInt(int sig) {
+  char * caughtSigInt = "Caught SIGINT. Quitting...\n";
+  write(1, "\n", 1);
+  write(1, caughtSigInt, strlen(caughtSigInt));
+  //ctrl c should function similarly to /shutdown with some additions
+  connected_user * iterator = list_head;
+  while (iterator != NULL) {
+    connected_user * temp = iterator;
+    iterator = iterator->next;
+    //send bye to all users
+    send(temp->socket, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+    //then close sockets and free memory
+    close(temp->socket);
+    free(temp->username);
+    free(temp);
+  }
+  //the server should save the user accounts in case someone created a new account
+  user_account * iterator2 = account_head;
+  FILE * writeToFile;
+  if ((optind + 2) != args) {
+    writeToFile = fopen(args2[optind + 2], "wb");
+  }
+  else {
+    writeToFile = fopen("accts.txt", "wb");
+  }
+  while (iterator2 != NULL) {
+    fprintf(writeToFile, "%s", iterator2->username);
+    fprintf(writeToFile, " ");
+    fwrite(iterator2->salt, 16, 1, writeToFile);
+    fwrite(iterator2->hash, 32, 1, writeToFile);
+    fprintf(writeToFile, "\n");
+    user_account * temp = iterator2;
+    iterator2 = iterator2->next;
+    free(temp->username);
+    free(temp->salt);
+    free(temp->hash);
+    free(temp);
+  }
+  fclose(writeToFile);
+  if (verboseFlag) {
+    write(1, "Sent to all users: ", 19);
+    write(1, "BYE \r\n\r\n", 8);
+    write(1, "\n", 1);
+    commandFlag = 1;
+  }
+  close(serverSocket);
+  //finally, need to kill the communication thread if it exists
+  pthread_cancel(cid);
+  exit(EXIT_SUCCESS);
 }

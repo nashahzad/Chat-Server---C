@@ -32,8 +32,12 @@ int parseMSG(char * input, char ** to, char ** from);
 int verifyUser(char * user, unsigned char * pass);
 int verifyPass(char * pass);
 int readRecord(FILE * file, char ** username, unsigned char ** salt, unsigned char ** hash);
+void handleSigInt(int sig);
 
 pthread_t cid;
 int commPipe[2];
+int serverSocket;
+int args;
+char ** args2;
 
 #endif
