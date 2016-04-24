@@ -141,6 +141,10 @@ int main(int argc, char *argv[]) {
         strcat(error, "BYE ");
         if(strcmp(buffer, error) == 0){
           fprintf(stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
+          send(clientSocket, "BYE \r\n\r\n", 8, 0);
+          if(verboseFlag){
+            fprintf(stderr, "%sSENT TO SERVER: BYE%s\n",BLUE, NORMAL);
+          }
           free(error);
           close(clientSocket);
           for(chat *iterator = head; iterator != NULL;){

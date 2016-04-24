@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
   FD_SET(0, &activeFdSet);
 
   //now listen for any connection requests
-  listen(serverSocket, 20); //arbitrary queue length
+  listen(serverSocket, 75); //arbitrary queue length
   printf("Currently listening on port %d\n", portNumber);
   int counter;
   int commandFlag = 1;
