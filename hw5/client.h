@@ -59,7 +59,7 @@ chat *head = NULL;
 	}	\
 	strcat(arg[0], "xterm"); \
 	sprintf(arg[1], "-geometry"); \
-	sprintf(arg[2], "55x35+%d", offset); \
+	sprintf(arg[2], "50x35+%d", offset); \
 	sprintf(arg[3], "-T"); \
 	sprintf(arg[4], "%s", name); \
 	sprintf(arg[5], "-bg");\
