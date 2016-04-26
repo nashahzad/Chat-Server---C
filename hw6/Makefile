@@ -1,18 +1,22 @@
 CFLAGS = -Wall -Werror -g -pthread
+OBJECT = sfwrite.o
 
-all: server client chat
+all: sfwrite.o server client chat
 
-server:
-	gcc $(CFLAGS) server.c -o $@ -lncurses -lssl -lcrypto
+$(OBJECT): sfwrite.c
+	gcc $(CFLAGS) -c $^
 
-client:
-	gcc $(CFLAGS) client.c -o $@ -lncurses
+server: $(OBJECT)
+	gcc $(CFLAGS) $(OBJECT) server.c -o $@ -lncurses -lssl -lcrypto
 
-chat:
-	gcc $(CFLAGS) chat.c -o $@ -lncurses
+client: $(OBJECT)
+	gcc $(CFLAGS) $(OBJECT) client.c -o $@ -lncurses
 
-mac:
-	gcc $(CFLAGS) server.c -o server -lncurses -lssl -lcrypto -Wno-error=deprecated-declarations
+chat: $(OBJECT)
+	gcc $(CFLAGS) $(OBJECT) chat.c -o $@ -lncurses
+
+mac: $(OBJECT)
+	gcc $(CFLAGS) $(OBJECT) server.c -o server -lncurses -lssl -lcrypto -Wno-error=deprecated-declarations
 
 clean:
 	rm -f server client chat

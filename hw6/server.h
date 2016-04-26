@@ -3,7 +3,8 @@
 
 #define _GNU_SOURCE
 
-#include <stdio.h>
+#include "sfwrite.h"
+//#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -18,7 +19,7 @@
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 
-#include <pthread.h>
+//#include <pthread.h>
 #include <time.h>
 #define MAX_INPUT 1024
 #define SALT_LENGTH 16

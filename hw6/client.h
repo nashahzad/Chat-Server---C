@@ -3,7 +3,8 @@
 
 #define _GNU_SOURCE
 
-#include <stdio.h>
+#include "sfwrite.h"
+//#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -17,7 +18,7 @@
 #include <ctype.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <pthread.h>
+//#include <pthread.h>
 #include <sys/epoll.h>
 #include <termios.h>
 #include <signal.h>
@@ -26,6 +27,9 @@
 #define BLUE "\x1B[1;36m"
 #define RED "\x1B[1;31m"
 #define NORMAL "\x1B[0m"
+
+//GLOBAL MUTEX LOCK
+pthread_mutex_t *lock;
 
 struct chat{
 	int fd;

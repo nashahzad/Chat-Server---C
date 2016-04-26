@@ -1,6 +1,8 @@
 #include "client.h"
 
 int main(int argc, char *argv[]) {
+  pthread_mutex_init(lock, NULL);
+
   signal(SIGINT, SIGINTHandler);
   int serverPort;
   char serverIP[MAX_INPUT] = {0};
