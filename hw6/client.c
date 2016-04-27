@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  send(clientSocket, "WOLFIE\r\n\r\n", strlen("WOLFIE\r\n\r\n"), 0);
+  send(clientSocket, "WOLFIE \r\n\r\n", 11, 0);
   if(verboseFlag){
       fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "WOLFIE", NORMAL);
     }
