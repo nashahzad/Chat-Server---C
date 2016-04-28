@@ -1,7 +1,14 @@
 #include "client.h"
 
 int main(int argc, char *argv[]) {
-  pthread_mutex_init(lock, NULL);
+  //INITIALIZE MUTEX FOR AUDIT LOG
+  auditLock = malloc(sizeof(pthread_mutex_t));
+  memset(auditLock, 0, sizeof(pthread_mutex_t));
+  if(pthread_mutex_init(auditLock, NULL) != 0){
+    fprintf(stderr, "Error failed to intialize pthread_mutex_t *lock!\n");
+    free(auditLock);
+    exit(EXIT_FAILURE);
+  }
 
   signal(SIGINT, SIGINTHandler);
   int serverPort;

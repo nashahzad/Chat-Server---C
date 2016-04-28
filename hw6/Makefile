@@ -19,4 +19,4 @@ mac: $(OBJECT)
 	gcc $(CFLAGS) $(OBJECT) server.c -o server -lncurses -lssl -lcrypto -Wno-error=deprecated-declarations
 
 clean:
-	rm -f server client chat
+	rm -f server client chat $(OBJECT)

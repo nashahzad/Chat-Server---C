@@ -29,7 +29,7 @@
 #define NORMAL "\x1B[0m"
 
 //GLOBAL MUTEX LOCK
-pthread_mutex_t *lock;
+pthread_mutex_t *auditLock;
 
 struct chat{
 	int fd;
