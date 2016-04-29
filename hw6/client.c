@@ -5,7 +5,7 @@ int main(int argc, char *argv[]) {
   auditLock = malloc(sizeof(pthread_mutex_t));
   memset(auditLock, 0, sizeof(pthread_mutex_t));
   if(pthread_mutex_init(auditLock, NULL) != 0){
-    fprintf(stderr, "Error failed to intialize pthread_mutex_t *lock!\n");
+    sf_write(auditLock, stderr, "Error failed to intialize pthread_mutex_t *lock!\n");
     free(auditLock);
     exit(EXIT_FAILURE);
   }
@@ -15,11 +15,10 @@ int main(int argc, char *argv[]) {
   char serverIP[MAX_INPUT] = {0};
   //first check the # of arg's to see if any flags were given
   int opt;
-  if ((argc == 5) || (argc == 6) || (argc == 7)) {
-    while((opt = getopt(argc, argv, "hcv")) != -1) {
+  while((opt = getopt(argc, argv, "hcva")) != -1) {
       switch(opt) {
         case 'h':
-          printf(USAGE);
+          sf_write(auditLock, stderr, USAGE);
           exit(EXIT_SUCCESS);
           break;
         case 'v':
@@ -28,28 +27,50 @@ int main(int argc, char *argv[]) {
         case 'c':
           createFlag = true;
           break;
+        case 'a':
+          auditBool = true;
+          break;
         case '?':
         default:
-          printf(USAGE);
+          sf_write(auditLock, stderr, USAGE);
           exit(EXIT_FAILURE);
           break;
       }
     }
-    strcpy(name, argv[optind]);
-    strcpy(serverIP, argv[optind + 1]);
-    serverPort = atoi(argv[optind + 2]);
-  }
+   
+    //AUDIT FILE WAS ADDED AND RIGHT NUMBER OF ARGUMENTS
+    if(auditBool && (argc - optind) == 4){
+      auditFile = argv[optind];
+      strcpy(name, argv[optind+1]);
+      strcpy(serverIP, argv[optind + 2]);
+      serverPort = atoi(argv[optind + 3]);
+    }
 
-  else if (argc != 4) {
-    printf(USAGE);
-    exit(EXIT_FAILURE);
-  }
+    //CLAIMED TO HAVE AUDIT FILE ADDED BUT NOT ENOUGH OR TOO MANY ARGUMENTS
+    else if(auditBool){
+      sf_write(auditLock, stderr, USAGE);
+        exit(EXIT_FAILURE);
+    }
 
-  else {
-    strcpy(name, argv[1]);
-    strcpy(serverIP, argv[2]);
-    serverPort = atoi(argv[3]);
-  }
+    //MEANING THAT NO AUDIT FILE WAS SPECIFIED
+    else if(!auditBool){
+      //CORRECT NUMBER OF ARGUMENTS PROVIDED
+      if((argc - optind) == 3){
+        auditFile = "audit.log\0";
+        strcpy(name, argv[optind]);
+        strcpy(serverIP, argv[optind + 1]);
+        serverPort = atoi(argv[optind + 2]);
+      }
+
+      //ELSE NOT ENOUGH OR TOO MANY ARGUMENTS
+      else{
+        printf(USAGE);
+        exit(EXIT_FAILURE);
+      }
+    }
+
+  //SETUP UP FILE *audit
+  auditFileOpen();
 
   //make socket
   clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -74,7 +95,7 @@ int main(int argc, char *argv[]) {
 
   send(clientSocket, "WOLFIE \r\n\r\n", 11, 0);
   if(verboseFlag){
-      fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "WOLFIE", NORMAL);
+      sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "WOLFIE", NORMAL);
     }
 
   //SET UP I/O MULTIPLEXING
@@ -108,11 +129,11 @@ int main(int argc, char *argv[]) {
 
         //IF SOMEONE CTRL-C THE SERVER JUST SHUTDOWN
         if(buffer[0] == '\0'){
-          fprintf(stderr, "Select was triggered, but nothing in socket came through.\n");
+          sf_write(auditLock, stderr, "Select was triggered, but nothing in socket came through.\n");
           char *message = "BYE \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
           }
           close(clientSocket);
           for(chat *iterator = head; iterator != NULL;){
@@ -136,7 +157,7 @@ int main(int argc, char *argv[]) {
         }
 
         if(!checkProtocol()){
-          fprintf(stderr, "\nBAD PACKET: %s\n", buffer);
+          sf_write(auditLock, stderr, "\nBAD PACKET: %s\n", buffer);
         }
 
         //CHECK TO SEE IF ITS A RESPONSE TO CLIENT COMMAND FROM SERVER
@@ -149,10 +170,10 @@ int main(int argc, char *argv[]) {
         memset(error, 0, strlen("BYE "));
         strcat(error, "BYE ");
         if(strcmp(buffer, error) == 0){
-          fprintf(stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
+          sf_write(auditLock, stdout, "%s\n", "The server has now SHUTDOWN, thus closing client now. Goodbye!");
           send(clientSocket, "BYE \r\n\r\n", 8, 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO SERVER: BYE%s\n",BLUE, NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO SERVER: BYE%s\n",BLUE, NORMAL);
           }
           free(error);
           close(clientSocket);
@@ -170,7 +191,7 @@ int main(int argc, char *argv[]) {
           exit(EXIT_SUCCESS);
         }
         free(error);
-        fprintf(stdout, "%s\n", buffer);
+        sf_write(auditLock, stdout, "%s\n", buffer);
       }
 
       //ELSE IF IS THERE SOMETHING ON STDIN
@@ -179,18 +200,18 @@ int main(int argc, char *argv[]) {
         removeNewline(buffer, strlen(buffer));
 
         if(verboseFlag){
-          fprintf(stderr, "%sRECEIVED FROM STDIN: %s%s\n", GREEN, buffer, NORMAL);
+          sf_write(auditLock, stderr, "%sRECEIVED FROM STDIN: %s%s\n", GREEN, buffer, NORMAL);
         }
 
         if(strcmp("/help", buffer) == 0){
-          fprintf(stdout, HELP);
+          sf_write(auditLock, stdout, HELP);
         }
 
         if(strcmp("/logout", buffer) == 0){
           char *message = "BYE \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
           }
           close(clientSocket);
           for(chat *iterator = head; iterator != NULL;){
@@ -211,7 +232,7 @@ int main(int argc, char *argv[]) {
           char *message = "TIME \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "TIME", NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "TIME", NORMAL);
           }
         }
 
@@ -219,7 +240,7 @@ int main(int argc, char *argv[]) {
           char *message = "LISTU \r\n\r\n\0";
           send(clientSocket, message, strlen(message), 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "LISTU", NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "LISTU", NORMAL);
           }
         }
 
@@ -254,7 +275,7 @@ int main(int argc, char *argv[]) {
               char *verbose = malloc(strlen(message));
               memset(verbose, 0, strlen(message));
               strncpy(verbose, message, strlen(message) - 5);
-              fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
+              sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
               free(verbose);
             }
             free(message);          
@@ -269,7 +290,7 @@ int main(int argc, char *argv[]) {
 bool checkProtocol(){
   int size;
   if((size = strlen(buffer)) < 4){
-    fprintf(stderr, "%s\n", "Bad packet sent from server!");
+    sf_write(auditLock, stderr, "%s\n", "Bad packet sent from server!");
     return false;
   }
 
@@ -292,7 +313,7 @@ bool checkProtocol(){
   }
 
   if(verboseFlag){
-      fprintf(stderr, "%sRECEIVED FROM SERVER: %s%s\n", GREEN, buffer, NORMAL);
+      sf_write(auditLock, stderr, "%sRECEIVED FROM SERVER: %s%s\n", GREEN, buffer, NORMAL);
   }
 
   if(flag){
@@ -300,7 +321,7 @@ bool checkProtocol(){
   }
 
   //REACHES HERE, THEN WENT THROUGH LOOP WITHOUT EVER FINDING PROTOCOL
-  fprintf(stderr, "%s\n", "Bad packet from server, didn't follow protocol!");
+  sf_write(auditLock, stderr, "%s\n", "Bad packet from server, didn't follow protocol!");
   return false;
 }
 
@@ -343,7 +364,7 @@ bool clientCommandCheck(){
       strcpy(buffer, buffer + 6);
 
       char *token = malloc(sizeof(char) * strlen(buffer));
-      fprintf(stdout, "%s\n", "USERS:");
+      sf_write(auditLock, stdout, "%s\n", "USERS:");
       strcpy(token, buffer);
       token = strtok(token, "\r\n");
       for(; token != NULL ;token = strtok(NULL, "\r\n")){
@@ -351,7 +372,7 @@ bool clientCommandCheck(){
           break;
         }
 
-        fprintf(stdout, "%s\n", token);;
+        sf_write(auditLock, stdout, "%s\n", token);;
       }
       return true;
     }
@@ -372,14 +393,14 @@ bool clientCommandCheck(){
       token = strtok(token, " ");
       token = strtok(NULL, " ");
       if(token == NULL){
-        fprintf(stderr, "%s\n", "There was no name passed with UOFF verb!");
+        sf_write(auditLock, stderr, "%s\n", "There was no name passed with UOFF verb!");
       }
 
       for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
         if(strcmp(iterator->name, token) == 0){
           send(iterator->fd, "UOFF", 4, 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO CHAT: %s%s\n", BLUE, "UOFF", NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO CHAT: %s%s\n", BLUE, "UOFF", NORMAL);
           }
           return true;
         }
@@ -414,8 +435,8 @@ bool clientCommandCheck(){
         free(from);
         free(to);
         free(token);
-        fprintf(stderr, "%s\n", "Messaging yourself?!");
-        fprintf(stdout, "\n>");
+        sf_write(auditLock, stderr, "%s\n", "Messaging yourself?!");
+        sf_write(auditLock, stdout, "\n>");
       }
 
       token = strtok(NULL, " ");
@@ -447,7 +468,7 @@ bool clientCommandCheck(){
               sprintf(temp, "<%s", message);
               send(iterator->fd, temp, strlen(temp), 0);
               if(verboseFlag){
-                fprintf(stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
+                sf_write(auditLock, stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
               }
               free(temp);
               break;
@@ -466,7 +487,7 @@ bool clientCommandCheck(){
           sprintf(temp, "<%s", message);
           send(socketPair[0], temp, strlen(temp), 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
           }
           free(temp);
         }
@@ -491,7 +512,7 @@ bool clientCommandCheck(){
               sprintf(temp, ">%s", message);
               send(iterator->fd, temp, strlen(temp), 0);
               if(verboseFlag){
-                fprintf(stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
+                sf_write(auditLock, stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
               }
               free(temp);
               break;
@@ -510,7 +531,7 @@ bool clientCommandCheck(){
           sprintf(temp, ">%s", message);
           send(socketPair[0], temp, strlen(temp), 0);
           if(verboseFlag){
-            fprintf(stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
+            sf_write(auditLock, stderr, "%sSENT TO CHAT: %s%s\n", BLUE, message, NORMAL);
           }
           free(temp);
         }
@@ -607,7 +628,7 @@ void handleChatMessageSTDIN(){
 
   if(strcmp(to, name) == 0){
     free(to);
-    fprintf(stderr, "%s\n", "Attempting to talk to yourself?!");
+    sf_write(auditLock, stderr, "%s\n", "Attempting to talk to yourself?!");
     return;
   }
 
@@ -635,7 +656,7 @@ void handleChatMessageSTDIN(){
     char *verbose = malloc(strlen(serverSend));
     memset(verbose, 0, strlen(serverSend));
     strncpy(verbose, serverSend, strlen(serverSend) - 5);
-    fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
+    sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
     free(verbose);
   }
 
@@ -716,7 +737,7 @@ void readBuffer(int fd, bool socket){
     }
     //IF PROTOCOL WAS NOT FOUND
     if(!protocol){
-      fprintf(stderr, "Protocol was not found! Packet: %s\n", buffer);
+      sf_write(auditLock, stderr, "Protocol was not found! Packet: %s\n", buffer);
     }
     //ELSE ATTACH PROTOCOL ONTO END OF BUFFER
     else{
@@ -742,9 +763,9 @@ void readBuffer(int fd, bool socket){
     buffer[size-1] = '\0';
     if(verboseFlag){
       if(fd == 0){
-        fprintf(stderr, "%sRECEIVED FROM STDIN: %s%s\n", GREEN, buffer, NORMAL);
+        sf_write(auditLock, stderr, "%sRECEIVED FROM STDIN: %s%s\n", GREEN, buffer, NORMAL);
       }else{
-        fprintf(stderr, "%sRECEIVED FROM A CHAT: %s%s\n", GREEN, buffer, NORMAL);
+        sf_write(auditLock, stderr, "%sRECEIVED FROM A CHAT: %s%s\n", GREEN, buffer, NORMAL);
       }
     }
   }
@@ -755,21 +776,21 @@ void loginProcedure(fd_set set, fd_set readSet){
 
   int wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
   if(wait == -1){
-    fprintf(stderr, "%s\n", "Error on select, exiting!");
+    sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
     exit(EXIT_FAILURE);
   }
 
   readBuffer(clientSocket, true);
   //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
   if(!checkProtocol()){
-    fprintf(stderr, "NO PROTOCOL ATTACHED, ABROTING LOGIN AND CLOSING CLIENT!\n");
+    sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABROTING LOGIN AND CLOSING CLIENT!\n");
     close(clientSocket);
     exit(EXIT_FAILURE);
   }
 
   //IF BUFFER IS LESS THAN 6 CAN'T BE EIFLOW
   if(strlen(buffer) < 6){
-    fprintf(stderr, "Buffer less than 6, can't possibly be EIFLOW\n");
+    sf_write(auditLock, stderr, "Buffer less than 6, can't possibly be EIFLOW\n");
     close(clientSocket);
     exit(EXIT_FAILURE);
   }
@@ -777,7 +798,7 @@ void loginProcedure(fd_set set, fd_set readSet){
   char *verb = malloc(6);
   strncpy(verb, buffer, 6);
   if(strcmp(verb, "EIFLOW") != 0){
-    fprintf(stderr, "Wrong verb, verb: %s\n", verb);
+    sf_write(auditLock, stderr, "Wrong verb, verb: %s\n", verb);
     free(verb);
     close(clientSocket);
     exit(EXIT_FAILURE);
@@ -796,7 +817,7 @@ void loginProcedure(fd_set set, fd_set readSet){
       char *verbose = malloc(strlen(message));
       memset(verbose, 0, strlen(message));
       strncpy(verbose, message, strlen(message) - 5);
-      fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
+      sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
       free(verbose);
     }
     free(message);
@@ -805,14 +826,14 @@ void loginProcedure(fd_set set, fd_set readSet){
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
@@ -824,7 +845,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     memset(temp, 0, 5 + 1 + strlen(name) + 1);
     strncpy(temp, buffer, 5 + 1 + strlen(name));
     if(strcmp(verb, temp) != 0){
-      fprintf(stderr, "Did not get correct message from server, shutting down client. Packet: %s\n", buffer);
+      sf_write(auditLock, stderr, "Did not get correct message from server, shutting down client. Packet: %s\n", buffer);
       close(clientSocket);
       free(verb);
       free(temp);
@@ -834,7 +855,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     free(temp);
 
     //NOW TO GET PASSWORD FROM USER AND MAKE SURE ITS VALID NEW PASSWORD
-    fprintf(stdout, "PASSWORD: ");
+    sf_write(auditLock, stdout, "PASSWORD: ");
     struct termios oflags, nflags;
     tcgetattr(fileno(stdin), &oflags);
     nflags = oflags;
@@ -868,7 +889,7 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     //IF NOT ALL TRUE, THEN SAY INVALID PASSWORD AND CLOSE
     if(!(upper && symbol && number)){
-      fprintf(stderr, "Typed in an invalid password! Closing down client.\n");
+      sf_write(auditLock, stderr, "Typed in an invalid password! Closing down client.\n");
       close(clientSocket);
       free(password);
       exit(EXIT_FAILURE);
@@ -882,7 +903,7 @@ void loginProcedure(fd_set set, fd_set readSet){
       char *verbose = malloc(strlen(message));
       memset(verbose, 0, strlen(message));
       strncpy(verbose, message, strlen(message) - 5);
-      fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
+      sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
       free(verbose);
     }
     free(message);
@@ -892,20 +913,20 @@ void loginProcedure(fd_set set, fd_set readSet){
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
 
     if(strlen(buffer) < 7){
-      fprintf(stderr, "Packet sent is too small to contain SSAPWEN, closing client.\n");
+      sf_write(auditLock, stderr, "Packet sent is too small to contain SSAPWEN, closing client.\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
@@ -914,7 +935,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     memset(verb, 0 , 8);
     strncpy(verb, buffer, 7);
     if(strcmp(verb, "SSAPWEN") != 0){
-      fprintf(stderr, "Received wrong verb from server, PACKET: %s\n", buffer);
+      sf_write(auditLock, stderr, "Received wrong verb from server, PACKET: %s\n", buffer);
       free(verb);
       close(clientSocket);
       exit(EXIT_FAILURE);
@@ -924,37 +945,37 @@ void loginProcedure(fd_set set, fd_set readSet){
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
 
-    fprintf(stdout, "%s\n", buffer);
+    sf_write(auditLock, stdout, "%s\n", buffer);
 
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
 
     //SHOULD BE PRINTING MESSAGE OF DAY NOW, DONE WITH LOGIN PROCEDURE OF NEW USER
-    fprintf(stdout, "%s\n", buffer);
+    sf_write(auditLock, stdout, "%s\n", buffer);
     return;
   }
 
@@ -970,7 +991,7 @@ void loginProcedure(fd_set set, fd_set readSet){
       char *verbose = malloc(strlen(message));
       memset(verbose, 0, strlen(message));
       strncpy(verbose, message, strlen(message) - 5);
-      fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
+      sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
       free(verbose);
     }
     free(message);
@@ -979,14 +1000,14 @@ void loginProcedure(fd_set set, fd_set readSet){
     readSet = set;
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
@@ -998,7 +1019,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     memset(temp, 0, 4 + 1 + strlen(name) + 1);
     strncpy(temp, buffer, 4 + 1 + strlen(name));
     if(strcmp(verb, temp) != 0){
-      fprintf(stderr, "Did not get correct message from server, shutting down client. Packet: %s\n", buffer);
+      sf_write(auditLock, stderr, "Did not get correct message from server, shutting down client. Packet: %s\n", buffer);
       close(clientSocket);
       free(verb);
       free(temp);
@@ -1007,7 +1028,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     free(verb);
 
     //NOW TO GET PASSWORD FROM USER AND JUST SEND IT TO SERVER
-    fprintf(stdout, "PASSWORD: ");
+    sf_write(auditLock, stdout, "PASSWORD: ");
     struct termios oflags, nflags;
     tcgetattr(fileno(stdin), &oflags);
     nflags = oflags;
@@ -1032,7 +1053,7 @@ void loginProcedure(fd_set set, fd_set readSet){
       char *verbose = malloc(strlen(message));
       memset(verbose, 0, strlen(message));
       strncpy(verbose, message, strlen(message) - 5);
-      fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
+      sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, verbose, NORMAL);
       free(verbose);
     }
     free(password);
@@ -1043,20 +1064,20 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
 
     if(strlen(buffer) < 4){
-      fprintf(stderr, "Message sent from server too small to be right message\n");
+      sf_write(auditLock, stderr, "Message sent from server too small to be right message\n");
       close(clientSocket);
       free(message);
       exit(EXIT_FAILURE);
@@ -1066,7 +1087,7 @@ void loginProcedure(fd_set set, fd_set readSet){
     memset(verb, 0, 5);
     strncpy(verb, buffer, 4);
     if(strcmp(verb, "SSAP") != 0){
-      fprintf(stderr, "Invalid verb sent or error sent, closing down client!\n");
+      sf_write(auditLock, stderr, "Invalid verb sent or error sent, closing down client!\n");
       free(verb);
       close(clientSocket);
       exit(EXIT_FAILURE);
@@ -1078,38 +1099,38 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
 
-    fprintf(stdout, "%s\n", buffer);
+    sf_write(auditLock, stdout, "%s\n", buffer);
 
     //NOW WAIT FOR SERVER RESPONSE AGAIN
     readSet = set;
 
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
-      fprintf(stderr, "%s\n", "Error on select, exiting!");
+      sf_write(auditLock, stderr, "%s\n", "Error on select, exiting!");
       exit(EXIT_FAILURE);
     }
 
     readBuffer(clientSocket, true);
     //NO PROTOCOL SENT ON MESSAGE ABORT LOGIN
     if(!checkProtocol()){
-      fprintf(stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
+      sf_write(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
       exit(EXIT_FAILURE);
     }
 
-    fprintf(stdout, "%s\n", buffer);
+    sf_write(auditLock, stdout, "%s\n", buffer);
 
     //DONE WITH LOGIN PROCESS OF EXISTING USER
     return;
@@ -1125,7 +1146,7 @@ void SIGINTHandler(int sig){
   write(0, "\033[K", 3);
   write(1, "\n", 1);
   if(verboseFlag){
-    fprintf(stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
+    sf_write(auditLock, stderr, "%sSENT TO SERVER: %s%s\n", BLUE, "BYE", NORMAL);
   }
   close(clientSocket);
   for(chat *iterator = head; iterator != NULL;){
@@ -1140,4 +1161,20 @@ void SIGINTHandler(int sig){
     }
   }
   exit(EXIT_SUCCESS);
+}
+
+void auditFileOpen(){
+  struct stat buf;
+
+  //FILE *audit
+  //a+ denotes reading and appending to end of file
+  //CHECK TO SEE IF FILE ALREADY EXISTS
+  if(stat(auditFile, &buf) == 0){
+    audit = fopen(auditFile, "a+");
+  }
+
+  //ELSE NEED TO CREATE FILE
+  else{
+    audit = fopen(auditFile, "a+");
+  }
 }

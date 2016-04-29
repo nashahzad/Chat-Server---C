@@ -44,7 +44,7 @@ chat *head = NULL;
 
 #define MAX_INPUT 1024
 
-#define USAGE "./client [-hcv] NAME SERVER_IP SERVER_PORT\n-h              Displays this help menu, and returns EXIT_SUCCESS.\n-c              Requests to server to create a new user.\n-v              Verbose print all traffic.\nNAME            Username to display\nSERVER_IP       IP to connect to\nSERVER_PORT     Port to connect to.\n"
+#define USAGE "./client [-hcv] [-a FILE] NAME SERVER_IP SERVER_PORT\n-a FILE		Path to audit log file\n-h              Displays this help menu, and returns EXIT_SUCCESS.\n-c              Requests to server to create a new user.\n-v              Verbose print all traffic.\nNAME            Username to display\nSERVER_IP       IP to connect to\nSERVER_PORT     Port to connect to.\n"
 
 #define HELP "\nHELP MENU\n" \
 "/time - Will ask the server for how long you have been connected.\n"\
@@ -86,7 +86,11 @@ chat *head = NULL;
 
 bool verboseFlag = false;
 
+bool auditBool = false;
+
 int createFlag = false;
+
+char *auditFile;
 
 char name[MAX_INPUT] = {0};
 
@@ -95,6 +99,10 @@ int clientSocket;
 int offset = 10;
 
 char *buffer = NULL;
+
+FILE *audit;
+
+void auditFileOpen();
 
 bool checkProtocol();
 
