@@ -319,21 +319,21 @@ void * handleClient(void * param) {
       write(1, "\n", 1);
       commandFlag = 1;
     }
-    if (strcmp(input, "WOLFIE\r\n\r\n") == 0) {
-      send(client, "EIFLOW\r\n\r\n", strlen("EIFLOW\r\n\r\n"), 0);
+    if (strcmp(input, "WOLFIE \r\n\r\n") == 0) {
+      send(client, "EIFLOW \r\n\r\n", strlen("EIFLOW \r\n\r\n"), 0);
       if (verboseFlag) {
         write(1, "Sent: ", 6);
-        write(1, "EIFLOW\r\n\r\n", 10);
+        write(1, "EIFLOW \r\n\r\n", 10);
         write(1, "\n", 1);
         commandFlag = 1;
       }
     }
     //incorrect protocol
     else {
-      send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+      send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
       if (verboseFlag) {
         write(1, "Sent: ", 6);
-        write(1, "BYE\r\n\r\n", 7);
+        write(1, "BYE \r\n\r\n", 7);
         write(1, "\n", 1);
         commandFlag = 1;
       }

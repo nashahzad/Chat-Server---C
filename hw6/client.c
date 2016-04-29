@@ -11,8 +11,6 @@ int main(int argc, char *argv[]) {
   }
 
   signal(SIGINT, SIGINTHandler);
-  int serverPort;
-  char serverIP[MAX_INPUT] = {0};
   //first check the # of arg's to see if any flags were given
   int opt;
   while((opt = getopt(argc, argv, "hcva")) != -1) {
@@ -976,6 +974,10 @@ void loginProcedure(fd_set set, fd_set readSet){
 
     //SHOULD BE PRINTING MESSAGE OF DAY NOW, DONE WITH LOGIN PROCEDURE OF NEW USER
     sf_write(auditLock, stdout, "%s\n", buffer);
+    char *t = timestamp();
+    sf_write(auditLock, audit, "%s, %s, LOGIN, %s:%d, success, %s\n", t, name, serverIP, serverPort, buffer);
+    free(t);
+
     return;
   }
 
@@ -1130,7 +1132,11 @@ void loginProcedure(fd_set set, fd_set readSet){
       exit(EXIT_FAILURE);
     }
 
+    //MOTD HERE
     sf_write(auditLock, stdout, "%s\n", buffer);
+    char *t = timestamp();
+    sf_write(auditLock, audit, "%s, %s, LOGIN, %s:%d, success, %s\n", t, name, serverIP, serverPort, buffer);
+    free(t);
 
     //DONE WITH LOGIN PROCESS OF EXISTING USER
     return;
@@ -1177,4 +1183,18 @@ void auditFileOpen(){
   else{
     audit = fopen(auditFile, "a+");
   }
+}
+
+
+char *timestamp(){
+  time_t rawtime;
+  struct tm *info;
+  char *s = malloc(18);
+  memset(s, 0, 18);
+  
+  time(&rawtime);
+  info = localtime(&rawtime);
+
+  strftime(s, 18, "%m-%d-%y-%l:%M%p", info);
+  return s;
 }

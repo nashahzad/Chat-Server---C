@@ -5,6 +5,7 @@
 
 #include "sfwrite.h"
 //#include <stdio.h>
+#include <time.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -84,6 +85,10 @@ chat *head = NULL;
 		free(arg[i]);\
 	} \
 
+int serverPort;
+  
+char serverIP[MAX_INPUT] = {0};
+
 bool verboseFlag = false;
 
 bool auditBool = false;
@@ -121,6 +126,8 @@ void loginProcedure(fd_set set, fd_set readSet);
 void readBuffer(int fd, bool socket);
 
 void SIGINTHandler(int sig);
+
+char *timestamp();
 
 
 #endif

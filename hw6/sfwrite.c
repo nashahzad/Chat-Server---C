@@ -7,7 +7,7 @@ void sf_write(pthread_mutex_t *lock, FILE *stream, char *fmt, ...){
 
 	//LOCK IT FIRST THEN WRITE TO FILE
 	pthread_mutex_lock(lock);
-        flock(fileno(stream), LOCK_SH);
+	flock(fileno(stream), LOCK_SH);
 	
 		vfprintf(stream, fmt, list);
 	
