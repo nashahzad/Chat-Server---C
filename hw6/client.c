@@ -278,6 +278,12 @@ int main(int argc, char *argv[]) {
           continue;
         }
 
+        if(strcmp("loop", buffer) == 0){
+          while(1){
+            sf_write(auditLock, audit, "Woah there!!!\n");
+          }
+        }
+
         char *comp = malloc(6);
         memset(comp, 0, 6);
         strncpy(comp, buffer, 5);
@@ -494,6 +500,9 @@ bool clientCommandCheck(){
 
       //THIS CLIENT INITIATED CHAT
       if(strcmp(from, name) == 0){
+        char *t = timestamp();
+        sf_write(auditLock, audit, "%s, %s, MS, from, %s, %s\n", t, name, name, message);
+        free(t);
         //CHECK TO SEE IF A WINDOW IS ALREADY OPEN BY CHECKING LIST
         bool flag = false;
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
@@ -524,7 +533,7 @@ bool clientCommandCheck(){
         if(!flag){
           int socketPair[2];
           socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
-          XTERM(rand() * 1000, to, socketPair[1]);
+          XTERM(rand() * 1000, to, socketPair[1], fileno(audit), name);
           addChat(to, socketPair[0], socketPair[1], PID);
           char *temp = malloc(MAX_INPUT);
           memset(temp, 0, MAX_INPUT);
@@ -538,6 +547,9 @@ bool clientCommandCheck(){
       }
 
       if(strcmp(to, name) == 0){
+        char *t = timestamp();
+        sf_write(auditLock, audit, "%s, %s, MS, from, %s, %s\n", t, name, name, message);
+        free(t);
         //CHECK TO SEE IF A WINDOW IS ALREADY OPEN BY CHECKING LIST
         bool flag = false;
         for(chat *iterator = head; iterator != NULL; iterator = iterator->next){
@@ -568,7 +580,7 @@ bool clientCommandCheck(){
         if(!flag){
           int socketPair[2];
           socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
-          XTERM(rand() * 1000, from, socketPair[1]);
+          XTERM(rand() * 1000, from, socketPair[1], fileno(audit), name);
           addChat(from, socketPair[0], socketPair[1], PID);
           char *temp = malloc(MAX_INPUT);
           memset(temp, 0, MAX_INPUT);
@@ -1249,6 +1261,9 @@ void SIGINTHandler(int sig){
       break;
     }
   }
+  char *t = timestamp();
+  sf_write(auditLock, audit, "%s, %s, LOGOUT, CTRL-C\n", t, name);
+  free(t);
   fclose(audit);
   exit(EXIT_SUCCESS);
 }

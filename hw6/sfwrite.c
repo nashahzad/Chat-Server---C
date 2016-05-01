@@ -10,6 +10,7 @@ void sf_write(pthread_mutex_t *lock, FILE *stream, char *fmt, ...){
 	pthread_mutex_lock(lock);
 	
 		vfprintf(stream, fmt, list);
+		fflush(stream);
 	
 	//THEN IMMEDIATELY UNLOCK THE LOCK AFTER WRITING TO FILE
 	flock(fileno(stream), LOCK_UN);

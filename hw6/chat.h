@@ -28,4 +28,6 @@ char buffer[MAX_INPUT];
 
 void removeNewline(char *string, int length);
 
+char *timestamp();
+
 #endif

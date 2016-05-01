@@ -6,8 +6,14 @@
 #define NORMAL "\x1B[0m"
 
 int main(int argc, char *argv[]){
+	pthread_mutex_t *lock = malloc(sizeof(pthread_mutex_t));
+	memset(lock, 0, sizeof(pthread_mutex_t));
+	pthread_mutex_init(lock, NULL);
+
 	memset(buffer, 0, MAX_INPUT);
 	int fd = atoi(argv[1]);
+	int auditFD = atoi(argv[2]);
+	FILE *audit = fdopen(auditFD, "a+");
 
 	fd_set set, readSet;
 
@@ -37,6 +43,11 @@ int main(int argc, char *argv[]){
 			
 
 			if(strcmp("/close\n", buffer) == 0){
+				char *t = timestamp();
+				sf_write(lock, audit, "%s, %s, /close, success, chat\n", t, argv[3]);
+			    free(t);	
+			    fclose(audit);
+			    close(auditFD);
 				close(fd);
 				exit(EXIT_SUCCESS);
 			}
@@ -84,3 +95,17 @@ void removeNewline(char *string, int length){
     }
   }
 }
+
+char *timestamp(){
+	  time_t rawtime;
+	    struct tm *info;
+	      char *s = malloc(18);
+	        memset(s, 0, 18);
+
+		  time(&rawtime);
+		    info = localtime(&rawtime);
+
+		      strftime(s, 18, "%m-%d-%y-%l:%M%p", info);
+		        return s;
+}
+

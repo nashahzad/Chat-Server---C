@@ -56,9 +56,9 @@ chat *head = NULL;
 
 #define TIME(hours, minutes, seconds) fprintf(stdout, "connected for %d hour(s), %d minute(s), and %d second(s)\n", hours, minutes, seconds);
 
-#define XTERM(offset, name, fd) char *arg[15]; \
-	arg[14] = NULL; \
-	for(int i = 0; i < 14; i++){ \
+#define XTERM(offset, name, fd, auditFD, n) char *arg[17]; \
+	arg[16] = NULL; \
+	for(int i = 0; i < 16; i++){ \
 		arg[i] = malloc(MAX_INPUT); \
 		memset(arg[i], 0, MAX_INPUT); \
 	}	\
@@ -76,12 +76,14 @@ chat *head = NULL;
 	sprintf(arg[11], "-e"); \
 	sprintf(arg[12], "./chat"); \
 	sprintf(arg[13], "%d", fd); \
+	sprintf(arg[14], "%d", auditFD);\
+	sprintf(arg[15], "%s", n);\
 	int PID = fork(); \
 	if(PID == 0){ \
 		execvp(arg[0], arg); \
 		exit(EXIT_FAILURE); \
 	} \
-	for(int i = 0; i < 14; i++){ \
+	for(int i = 0; i < 16; i++){ \
 		free(arg[i]);\
 	} \
 
