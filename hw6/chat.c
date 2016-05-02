@@ -44,7 +44,7 @@ int main(int argc, char *argv[]){
 
 			if(strcmp("/close\n", buffer) == 0){
 				char *t = timestamp();
-				sf_write(lock, audit, "%s, %s, /close, success, chat\n", t, argv[3]);
+				sfwrite(lock, audit, "%s, %s, /close, success, chat\n", t, argv[3]);
 			    free(t);	
 			    fclose(audit);
 			    close(auditFD);

@@ -1,5 +1,5 @@
-#ifndef sfwrite
-#define sfwrite
+#ifndef sf_write
+#define sf_write
 
 #include <pthread.h>
 #include <stdio.h>
@@ -8,6 +8,6 @@
 #include <stdarg.h>
 
 
-void sf_write(pthread_mutex_t *c, FILE *stream, char *fmt, ...);
+void sfwrite(pthread_mutex_t *c, FILE *stream, char *fmt, ...);
 
 #endif

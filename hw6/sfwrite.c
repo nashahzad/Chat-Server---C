@@ -1,7 +1,7 @@
 #include "sfwrite.h"
 
 
-void sf_write(pthread_mutex_t *lock, FILE *stream, char *fmt, ...){
+void sfwrite(pthread_mutex_t *lock, FILE *stream, char *fmt, ...){
 	va_list list;
 	va_start(list, fmt);
 
