@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
   serverInfo.sin_addr.s_addr = inet_addr(serverIP);
   serverInfo.sin_port = htons(serverPort);
 
-  //then try to connect, begin login sequence by sending WOLFIE\r\n\r\n
+  //then try to connect, begin login sequence by sending WOLFIE \r\n\r\n
   int connection = connect(clientSocket, (struct sockaddr * ) &serverInfo, sizeof(serverInfo));
   if (connection == -1) {
     printf("Connect failed.\n");
@@ -232,6 +232,7 @@ int main(int argc, char *argv[]) {
           char *t = timestamp();
           sfwrite(auditLock, audit, "%s, %s, LOGOUT, intentional\n", t, name);
           free(t);
+	        free(auditLock);
           fclose(audit);
           exit(EXIT_SUCCESS);
         }
@@ -262,7 +263,9 @@ int main(int argc, char *argv[]) {
 
         if(strcmp("/audit", buffer) == 0){
           char byte[1] = {'\0'};
-      	  flock(fileno(audit), LOCK_EX);
+      	 
+          flock(fileno(audit), LOCK_EX);          
+         
           fclose(audit);
           int fd = open(auditFile, O_RDONLY);
           for(int bytes_read = 0; (bytes_read = read(fd, byte, 1)) != 0;){
@@ -270,7 +273,8 @@ int main(int argc, char *argv[]) {
           }
           close(fd);
           audit = fopen(auditFile, "a+");
-	        flock(fileno(audit), LOCK_UN);
+	       
+          flock(fileno(audit), LOCK_UN);
 
           char *t = timestamp();
           sfwrite(auditLock, audit, "%s, %s, CMD, %s, success, client\n", t, name, buffer);
@@ -312,14 +316,8 @@ int main(int argc, char *argv[]) {
             
             //PROBABLY JUST MESSAGE TO PERSON
             char *message = malloc(MAX_INPUT);
-            memset(message, 0, MAX_INPUT);
-            strcat(message, "MSG \0");
-            strcat(message, iterator->name);
-            strcat(message, " ");
-            strcat(message, name);
-            strcat(message, " ");
-            strcat(message, buffer);
-            strcat(message, " \r\n\r\n\0");
+      	    memset(message, 0, MAX_INPUT);
+      	    sprintf(message, "MSG %s %s %s \r\n\r\n", iterator->name, name, buffer);
             send(clientSocket, message, strlen(message), 0);
             if(verboseFlag){
               char *verbose = malloc(strlen(message));
@@ -357,6 +355,8 @@ bool checkProtocol(){
         //JUST MEMSET PROTOCOL
         memset(buffer + i, 0, 4);
         flag = true;
+	free(check);
+	break;
       }
       free(check);
     }
@@ -1264,6 +1264,7 @@ void SIGINTHandler(int sig){
   char *t = timestamp();
   sfwrite(auditLock, audit, "%s, %s, LOGOUT, CTRL-C\n", t, name);
   free(t);
+  free(auditLock);
   fclose(audit);
   exit(EXIT_SUCCESS);
 }
