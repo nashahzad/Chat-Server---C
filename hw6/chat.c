@@ -49,6 +49,7 @@ int main(int argc, char *argv[]){
 			    fclose(audit);
 			    close(auditFD);
 				close(fd);
+				free(lock);
 				exit(EXIT_SUCCESS);
 			}
 
@@ -66,6 +67,7 @@ int main(int argc, char *argv[]){
 				FD_SET(fd, &set);
 				fprintf(stdout, "%sReceive %s: User had logged off or disconnect.%s\n", RED, buffer, NORMAL);
 				read(0, buffer, 1);
+				free(lock);
 				exit(EXIT_SUCCESS);
 			}
 

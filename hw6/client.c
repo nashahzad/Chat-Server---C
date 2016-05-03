@@ -199,6 +199,10 @@ int main(int argc, char *argv[]) {
         readBuffer(0, false);
         removeNewline(buffer, strlen(buffer));
 
+	if(buffer[0] == '\0'){
+		continue;
+	}
+
         if(verboseFlag){
           sfwrite(auditLock, stderr, "%sRECEIVED FROM STDIN: %s%s\n", GREEN, buffer, NORMAL);
         }
@@ -264,7 +268,7 @@ int main(int argc, char *argv[]) {
         if(strcmp("/audit", buffer) == 0){
           char byte[1] = {'\0'};
       	 
-          flock(fileno(audit), LOCK_EX);          
+          flock(fileno(audit), LOCK_SH);          
          
           fclose(audit);
           int fd = open(auditFile, O_RDONLY);
@@ -284,6 +288,7 @@ int main(int argc, char *argv[]) {
 
         if(strcmp("loop", buffer) == 0){
           while(1){
+		 usleep(10);
             sfwrite(auditLock, audit, "Woah there!!!\n");
           }
         }
