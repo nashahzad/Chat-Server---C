@@ -175,7 +175,6 @@ int main(int argc, char *argv[]) {
           if (clientSocket == -1) {
             int errcode = errno;
             sfwrite(stdoutLock, stderr, "Accept error. Code %d.\n", errcode);
-            fflush(stdout);
           }
           else {
             //login thread
@@ -209,8 +208,7 @@ int main(int argc, char *argv[]) {
               for(i = 0; i < SALT_LENGTH; i++) {
                 sfwrite(stdoutLock, stdout, "%02x", iterator->salt[i]);
               }
-              sfwrite(stdoutLock, stdout, " ");
-              sfwrite(stdoutLock, stdout, "Hash: ");
+              sfwrite(stdoutLock, stdout, " Hash: ");
               for(i = 0; i < SHA256_DIGEST_LENGTH; i++) {
                 sfwrite(stdoutLock, stdout, "%02x", iterator->hash[i]);
               }
@@ -253,9 +251,7 @@ int main(int argc, char *argv[]) {
             }
             fclose(writeToFile);
             if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent to all users: ");
-              sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-              sfwrite(stdoutLock, stdout, "\n");
+              sfwrite(stdoutLock, stdout, "Sent to all users: BYE \r\n\r\n\n");
               commandFlag = 1;
             }
             close(serverSocket);
@@ -319,17 +315,13 @@ void * handleClient(void * param) {
   //check if client started login protocol correctly
   if (recvData > 0) {
     if (verboseFlag) {
-      sfwrite(stdoutLock, stdout, "Received: ");
-      sfwrite(stdoutLock, stdout, input);
-      sfwrite(stdoutLock, stdout, "\n");
+      sfwrite(stdoutLock, stdout, "Received: %s\n", input);
       commandFlag = 1;
     }
     if (strcmp(input, "WOLFIE \r\n\r\n") == 0) {
       send(client, "EIFLOW \r\n\r\n", strlen("EIFLOW \r\n\r\n"), 0);
       if (verboseFlag) {
-        sfwrite(stdoutLock, stdout, "Sent: ");
-        sfwrite(stdoutLock, stdout, "EIFLOW \r\n\r\n");
-        sfwrite(stdoutLock, stdout, "\n");
+        sfwrite(stdoutLock, stdout, "Sent: EIFLOW \r\n\r\n\n");
         commandFlag = 1;
       }
     }
@@ -337,9 +329,7 @@ void * handleClient(void * param) {
     else {
       send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
       if (verboseFlag) {
-        sfwrite(stdoutLock, stdout, "Sent: ");
-        sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-        sfwrite(stdoutLock, stdout, "\n");
+        sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
         commandFlag = 1;
       }
     }
@@ -354,9 +344,7 @@ void * handleClient(void * param) {
   recvData = recv(client, input, MAX_INPUT, 0);
   if (recvData > 0) {
     if (verboseFlag) {
-      sfwrite(stdoutLock, stdout, "Received: ");
-      sfwrite(stdoutLock, stdout, input);
-      sfwrite(stdoutLock, stdout, "\n");
+      sfwrite(stdoutLock, stdout, "Received: %s\n", input);
       commandFlag = 1;
     }
     char check1[10] = {0};
@@ -381,9 +369,7 @@ void * handleClient(void * param) {
             strcat(authResponse, " \r\n\r\n");
             send(client, authResponse, strlen(authResponse), 0);
             if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent: ");
-              sfwrite(stdoutLock, stdout, authResponse);
-              sfwrite(stdoutLock, stdout, "\n");
+              sfwrite(stdoutLock, stdout, "Sent: %s\n", authResponse);
               commandFlag = 1;
             }
 
@@ -392,9 +378,7 @@ void * handleClient(void * param) {
             recvData = recv(client, input, MAX_INPUT, 0);
             if (recvData > 0) {
               if (verboseFlag) {
-                sfwrite(stdoutLock, stdout, "Received: ");
-                sfwrite(stdoutLock, stdout, input);
-                sfwrite(stdoutLock, stdout, "\n");
+                sfwrite(stdoutLock, stdout, "Received: %s\n", input);
                 commandFlag = 1;
               }
               if (checkEOM(input)) {
@@ -419,9 +403,7 @@ void * handleClient(void * param) {
                     //if pw is correct, send SSAP, HI, and MOTD
                     send(client, "SSAP \r\n\r\n", strlen("SSAP \r\n\r\n"), 0);
                     if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: ");
-                      sfwrite(stdoutLock, stdout, "SSAP \r\n\r\n");
-                      sfwrite(stdoutLock, stdout, "\n");
+                      sfwrite(stdoutLock, stdout, "Sent: SSAP \r\n\r\n\n");
                       commandFlag = 1;
                     }
 
@@ -432,9 +414,7 @@ void * handleClient(void * param) {
                     strcat(hiResponse, " \r\n\r\n");
                     send(client, hiResponse, strlen(hiResponse), 0);
                     if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: ");
-                      sfwrite(stdoutLock, stdout, hiResponse);
-                      sfwrite(stdoutLock, stdout, "\n");
+                      sfwrite(stdoutLock, stdout, "Sent: %s\n", hiResponse);
                       commandFlag = 1;
                     }
 
@@ -445,9 +425,7 @@ void * handleClient(void * param) {
                     strcat(sendMOTD, " \r\n\r\n");
                     send(client, sendMOTD, strlen(sendMOTD), 0);
                     if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: ");
-                      sfwrite(stdoutLock, stdout, sendMOTD);
-                      sfwrite(stdoutLock, stdout, "\n");
+                      sfwrite(stdoutLock, stdout, "Sent: %s\n", sendMOTD);
                       commandFlag = 1;
                     }
 
@@ -457,27 +435,21 @@ void * handleClient(void * param) {
                   else {
                     send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
                     if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: ");
-                      sfwrite(stdoutLock, stdout, "ERR 02 BAD PASSWORD \r\n\r\n");
-                      sfwrite(stdoutLock, stdout, "\n");
+                      sfwrite(stdoutLock, stdout, "Sent: ERR 02 BAD PASSWORD \r\n\r\n\n");
                       commandFlag = 1;
                     }
-                    send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+                    send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
                     if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: ");
-                      sfwrite(stdoutLock, stdout, "BYE\r\n\r\n");
-                      sfwrite(stdoutLock, stdout, "\n");
+                      sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                       commandFlag = 1;
                     }
                   }
                 }
                 //not correct protocol
                 else {
-                  send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+                  send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, "BYE\r\n\r\n");
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                     commandFlag = 1;
                   }
                 }
@@ -493,16 +465,12 @@ void * handleClient(void * param) {
           else {
             send(client, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
             if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent: ");
-              sfwrite(stdoutLock, stdout, "ERR 01 USER NOT AVAILABLE \r\n\r\n");
-              sfwrite(stdoutLock, stdout, "\n");
+              sfwrite(stdoutLock, stdout, "Sent: ERR 01 USER NOT AVAILABLE \r\n\r\n\n");
               commandFlag = 1;
             }
             send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
             if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent: ");
-              sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-              sfwrite(stdoutLock, stdout, "\n");
+              sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
               commandFlag = 1;
             }
             close(client);
@@ -512,16 +480,12 @@ void * handleClient(void * param) {
         else {
           send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
           if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ");
-            sfwrite(stdoutLock, stdout, "ERR 00 USER NAME TAKEN \r\n\r\n");
-            sfwrite(stdoutLock, stdout, "\n");
+            sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
             commandFlag = 1;
           }
           send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
           if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ");
-            sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-            sfwrite(stdoutLock, stdout, "\n");
+            sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
             commandFlag = 1;
           }
           close(client);
@@ -538,9 +502,7 @@ void * handleClient(void * param) {
           strcat(hiResponse, " \r\n\r\n");
           send(client, hiResponse, strlen(hiResponse), 0);
           if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ");
-            sfwrite(stdoutLock, stdout, hiResponse);
-            sfwrite(stdoutLock, stdout, "\n");
+            sfwrite(stdoutLock, stdout, "Sent: %s\n", hiResponse);
             commandFlag = 1;
           }
 
@@ -549,9 +511,7 @@ void * handleClient(void * param) {
           recvData = recv(client, input, MAX_INPUT, 0);
           if (recvData > 0) {
             if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Received: ");
-              sfwrite(stdoutLock, stdout, input);
-              sfwrite(stdoutLock, stdout, "\n");
+              sfwrite(stdoutLock, stdout, "Received: %s\n", input);
               commandFlag = 1;
             }
             if (checkEOM(input)) {
@@ -563,9 +523,7 @@ void * handleClient(void * param) {
                   char * ssapwenMessage = "SSAPWEN \r\n\r\n";
                   send(client, ssapwenMessage, strlen(ssapwenMessage), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, ssapwenMessage);
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: %s\n", ssapwenMessage);
                     commandFlag = 1;
                   }
 
@@ -576,9 +534,7 @@ void * handleClient(void * param) {
                   strcat(hiMessage, " \r\n\r\n");
                   send(client, hiMessage, strlen(hiMessage), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, hiMessage);
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: %s\n", hiMessage);
                     commandFlag = 1;
                   }
 
@@ -589,9 +545,7 @@ void * handleClient(void * param) {
                   strcat(motdMessage, " \r\n\r\n");
                   send(client, motdMessage, strlen(motdMessage), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, motdMessage);
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: %s\n", motdMessage);
                     commandFlag = 1;
                   }
                   //finally set the addClient as wellas addNew (since new account) flag to 1
@@ -602,16 +556,12 @@ void * handleClient(void * param) {
                   //bad password, send ERR 02
                   send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, "ERR 02 BAD PASSWORD \r\n\r\n");
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: ERR 02 BAD PASSWORD \r\n\r\n\n");
                     commandFlag = 1;
                   }
                   send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                     commandFlag = 1;
                   }
                   close(client);
@@ -619,22 +569,18 @@ void * handleClient(void * param) {
               }
               //incorrect protocol
               else {
-                send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+                send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
                 if (verboseFlag) {
-                  sfwrite(stdoutLock, stdout, "Sent: ");
-                  sfwrite(stdoutLock, stdout, "BYE\r\n\r\n");
-                  sfwrite(stdoutLock, stdout, "\n");
+                  sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                   commandFlag = 1;
                 }
               }
             }
             //incorrect protocol
             else {
-              send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+              send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
               if (verboseFlag) {
-                sfwrite(stdoutLock, stdout, "Sent: ");
-                sfwrite(stdoutLock, stdout, "BYE\r\n\r\n");
-                sfwrite(stdoutLock, stdout, "\n");
+                sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                 commandFlag = 1;
               }
             }
@@ -658,16 +604,12 @@ void * handleClient(void * param) {
         else {
           send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
           if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ");
-            sfwrite(stdoutLock, stdout, "ERR 00 USER NAME TAKEN \r\n\r\n");
-            sfwrite(stdoutLock, stdout, "\n");
+            sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
             commandFlag = 1;
           }
           send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
           if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ");
-            sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-            sfwrite(stdoutLock, stdout, "\n");
+            sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
             commandFlag = 1;
           }
           close(client);
@@ -675,11 +617,9 @@ void * handleClient(void * param) {
       }
       //incorrect protocol
       else {
-        send(client, "BYE\r\n\r\n", strlen("BYE\r\n\r\n"), 0);
+        send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
         if (verboseFlag) {
-          sfwrite(stdoutLock, stdout, "Sent: ");
-          sfwrite(stdoutLock, stdout, "BYE\r\n\r\n");
-          sfwrite(stdoutLock, stdout, "\n");
+          sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
           commandFlag = 1;
         }
       }
@@ -856,9 +796,7 @@ void * communicationThread(void * param) {
                     temp = temp->next;
                   }
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent to all users: ");
-                    sfwrite(stdoutLock, stdout, uoffMessage);
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent to all users: %s\n", uoffMessage);
                     commandFlag = 1;
                   }
                   free(storeName);
@@ -871,9 +809,7 @@ void * communicationThread(void * param) {
                   sprintf(emitMessage, "%s %d %s", "EMIT", difference, "\r\n\r\n");
                   send(iterator->socket, emitMessage, strlen(emitMessage), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, emitMessage);
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: %s\n", emitMessage);
                     commandFlag = 1;
                   }
                 }
@@ -904,9 +840,7 @@ void * communicationThread(void * param) {
                   //now have the full message
                   send(iterator->socket, utsilMessage, strlen(utsilMessage), 0);
                   if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ");
-                    sfwrite(stdoutLock, stdout, utsilMessage);
-                    sfwrite(stdoutLock, stdout, "\n");
+                    sfwrite(stdoutLock, stdout, "Sent: %s\n", utsilMessage);
                     commandFlag = 1;
                   }
                   //free the pointer
@@ -936,9 +870,7 @@ void * communicationThread(void * param) {
                     if ((sender == 0) || (receiver == 0)) {
                       send(iterator->socket, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
                       if (verboseFlag) {
-                        sfwrite(stdoutLock, stdout, "Sent: ");
-                        sfwrite(stdoutLock, stdout, "ERR 01 USER NOT AVAILABLE \r\n\r\n");
-                        sfwrite(stdoutLock, stdout, "\n");
+                        sfwrite(stdoutLock, stdout, "Sent: ERR 01 USER NOT AVAILABLE \r\n\r\n\n");
                         commandFlag = 1;
                       }
                     }
@@ -947,16 +879,12 @@ void * communicationThread(void * param) {
                       strcat(input, "\r\n\r\n");
                       send(sender, input, strlen(input), 0);
                       if (verboseFlag) {
-                        sfwrite(stdoutLock, stdout, "Sent: ");
-                        sfwrite(stdoutLock, stdout, input);
-                        sfwrite(stdoutLock, stdout, "\n");
+                        sfwrite(stdoutLock, stdout, "Sent: %s\n", input);
                         commandFlag = 1;
                       }
                       send(receiver, input, strlen(input), 0);
                       if (verboseFlag) {
-                        sfwrite(stdoutLock, stdout, "Sent: ");
-                        sfwrite(stdoutLock, stdout, input);
-                        sfwrite(stdoutLock, stdout, "\n");
+                        sfwrite(stdoutLock, stdout, "Sent: %s\n", input);
                         commandFlag = 1;
                       }
                     }
@@ -1014,9 +942,7 @@ void * communicationThread(void * param) {
                 temp = temp->next;
               }
               if (verboseFlag) {
-                sfwrite(stdoutLock, stdout, "Sent to all users: ");
-                sfwrite(stdoutLock, stdout, uoffMessage);
-                sfwrite(stdoutLock, stdout, "\n");
+                sfwrite(stdoutLock, stdout, "Sent to all users: %s\n", uoffMessage);
                 commandFlag = 1;
               }
               free(storeName);
@@ -1267,9 +1193,7 @@ void handleSigInt(int sig) {
   }
   fclose(writeToFile);
   if (verboseFlag) {
-    sfwrite(stdoutLock, stdout, "Sent to all users: ");
-    sfwrite(stdoutLock, stdout, "BYE \r\n\r\n");
-    sfwrite(stdoutLock, stdout, "\n");
+    sfwrite(stdoutLock, stdout, "Sent to all users: BYE \r\n\r\n\n");
     commandFlag = 1;
   }
   close(serverSocket);
