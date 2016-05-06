@@ -23,7 +23,7 @@
 #include <time.h>
 #define MAX_INPUT 1024
 #define SALT_LENGTH 16
-#define USAGE "./server [-h|-v] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n-h            Displays help menu & returns EXIT_SUCCESS.\n-v            Verbose print all incoming and outgoing protocol verbs and content.\nPORT_NUMBER   Port number to listen on.\nMOTD          Message to display to the client when they connect.\nACCOUNTS_FILE File containing user data to be loaded upon execution.\n"
+#define USAGE "./server [-h|-v] [-t THREAD_COUNT] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n-h            Displays help menu & returns EXIT_SUCCESS.\n-t THREAD_COUNT The number of threads used for the login queue.\n-v            Verbose print all incoming and outgoing protocol verbs and content.\nPORT_NUMBER   Port number to listen on.\nMOTD          Message to display to the client when they connect.\nACCOUNTS_FILE File containing user data to be loaded upon execution.\n"
 
 void * handleClient(void * param);
 void * communicationThread(void * param);
@@ -40,5 +40,7 @@ int commPipe[2];
 int serverSocket;
 int args;
 char ** args2;
+int threadCount = 2;
+pthread_mutex_t *stdoutLock;
 
 #endif
