@@ -597,6 +597,23 @@ void * handleClient(void * param) {
           }
         }
         else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
+          
+          if(checkAvailability(name)){}
+          else{
+            send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
+              commandFlag = 1;
+            }
+            send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+              commandFlag = 1;
+            }
+            close(client);
+            continue;
+          }
+
           //does the name already exist?
           if (!(verifyUser(name, NULL))) {
             checkAvailability(name);
