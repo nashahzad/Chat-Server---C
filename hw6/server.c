@@ -912,7 +912,7 @@ void * communicationThread(void * param) {
     if (FD_ISSET(commPipe[0], &clientList)) {
       char stuff[3];
       read(commPipe[0], stuff, 1);
-      fprintf(stderr, "%s\n", "Scooby-Doo!");
+      //fprintf(stderr, "%s\n", "Scooby-Doo!");
       continue;
     }
 
@@ -936,6 +936,7 @@ void * communicationThread(void * param) {
               if (checkEOM(input)) {
                 //was the response a /logout?
                 if (strcmp(input, "BYE") == 0) {
+                  pthread_mutex_lock(&usersLock);
                   //take note of the name
                   char * storeName;
                   //need to remove the socket from the list and free up the memory it took up....but where is the user on the list?
@@ -984,6 +985,7 @@ void * communicationThread(void * param) {
                     commandFlag = 1;
                   }
                   free(storeName);
+                  pthread_mutex_unlock(&usersLock);
                   //write(commPipe[1], "a", 1);
                 }
                 else if (strcmp(input, "TIME ") == 0) {
@@ -1003,6 +1005,7 @@ void * communicationThread(void * param) {
                   char * utsilMessage = malloc(mallocSize);
                   memset(utsilMessage, 0, mallocSize);
                   strcpy(utsilMessage, "UTSIL ");
+                  pthread_mutex_lock(&usersLock);
                   connected_user * temp = list_head;
                   while (temp != NULL) {
                     //if we're approaching the end of the malloc's space, need to realloc
@@ -1023,6 +1026,7 @@ void * communicationThread(void * param) {
                   strcat(utsilMessage, " \r\n\r\n");
                   //now have the full message
                   send(iterator->socket, utsilMessage, strlen(utsilMessage), 0);
+                  pthread_mutex_unlock(&usersLock);
                   if (verboseFlag) {
                     sfwrite(stdoutLock, stdout, "Sent: %s\n", utsilMessage);
                     commandFlag = 1;
@@ -1086,6 +1090,7 @@ void * communicationThread(void * param) {
             if (data == 0) {
               //iterator already contains the user information
               char uoffMessage[MAX_INPUT] = {0};
+              pthread_mutex_lock(&usersLock);
               connected_user * temp = list_head;
               char * storeName;
               //still need to remove the user from the list
