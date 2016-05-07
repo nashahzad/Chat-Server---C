@@ -857,6 +857,9 @@ void loginProcedure(fd_set set, fd_set readSet){
   if(!checkProtocol()){
     sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABROTING LOGIN AND CLOSING CLIENT!\n");
     close(clientSocket);
+    char *t = timestamp();
+    sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure-no protocol, %s\n", t, name, serverIP, serverPort, buffer);
+    free(t);
     fclose(audit);
     exit(EXIT_FAILURE);
   }
@@ -865,6 +868,9 @@ void loginProcedure(fd_set set, fd_set readSet){
   if(strlen(buffer) < 6){
     sfwrite(auditLock, stderr, "Buffer less than 6, can't possibly be EIFLOW\n");
     close(clientSocket);
+    char *t = timestamp();
+    sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+    free(t);
     fclose(audit);
     exit(EXIT_FAILURE);
   }
@@ -875,6 +881,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     sfwrite(auditLock, stderr, "Wrong verb, verb: %s\n", verb);
     free(verb);
     close(clientSocket);
+    char *t = timestamp();
+    sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+    free(t);
     fclose(audit);
     exit(EXIT_FAILURE);
   }
@@ -902,6 +911,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+    sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+    free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -911,6 +923,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -926,6 +941,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       close(clientSocket);
       free(verb);
       free(temp);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -970,6 +988,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       sfwrite(auditLock, stderr, "Typed in an invalid password! Closing down client.\n");
       close(clientSocket);
       free(password);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, INVALID PASSWORD\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -993,6 +1014,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1002,6 +1026,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure-no protocol, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1009,6 +1036,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(strlen(buffer) < 7){
       sfwrite(auditLock, stderr, "Packet sent is too small to contain SSAPWEN, closing client.\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1020,6 +1050,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       sfwrite(auditLock, stderr, "Received wrong verb from server, PACKET: %s\n", buffer);
       free(verb);
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }  
@@ -1029,6 +1062,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1038,6 +1074,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1048,6 +1087,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1057,6 +1099,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1092,6 +1137,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1101,6 +1149,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1116,6 +1167,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       close(clientSocket);
       free(verb);
       free(temp);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1159,6 +1213,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1168,6 +1225,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1176,6 +1236,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       sfwrite(auditLock, stderr, "Message sent from server too small to be right message\n");
       close(clientSocket);
       free(message);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1187,6 +1250,9 @@ void loginProcedure(fd_set set, fd_set readSet){
       sfwrite(auditLock, stderr, "Invalid verb sent or error sent, closing down client!\n");
       free(verb);
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1198,6 +1264,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1207,6 +1276,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1219,6 +1291,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     wait = select(FD_SETSIZE, &readSet, NULL, NULL, NULL);
     if(wait == -1){
       sfwrite(auditLock, stderr, "%s\n", "Error on select, exiting!");
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, error on select\n", t, name, serverIP, serverPort);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
@@ -1228,6 +1303,9 @@ void loginProcedure(fd_set set, fd_set readSet){
     if(!checkProtocol()){
       sfwrite(auditLock, stderr, "NO PROTOCOL ATTACHED, ABORTING LOGIN AND CLOSING CLIENT!\n");
       close(clientSocket);
+      char *t = timestamp();
+      sfwrite(auditLock, audit, "%s, %s, LOGIN, %s:%d, failure, %s\n", t, name, serverIP, serverPort, buffer);
+      free(t);
       fclose(audit);
       exit(EXIT_FAILURE);
     }
