@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
               iterator = iterator->next;
             }
             sfwrite(stdoutLock, stdout, "------------------------------------------------\n");
-            pthread_mutex_lock(&accountsLock);
+            pthread_mutex_unlock(&accountsLock);
           }
           else if (strncmp("/shutdown\n", test, 10) == 0) {
             //acquire mutexes to ensure previous requests are complete
@@ -413,7 +413,7 @@ void * handleClient(void * param) {
     //client closed unexpectedly
     else {
       close(client);
-      return NULL;
+      continue;
     }
 
     //acquire mutexes
@@ -538,7 +538,7 @@ void * handleClient(void * param) {
               //client closed unexpectedly
               else {
                 close(client);
-                return NULL;
+                continue;
               }
             }
             //name doesn't exist in the list, send ERR 01
@@ -789,7 +789,7 @@ void * handleClient(void * param) {
     pthread_mutex_unlock(&accountsLock);
     pthread_mutex_unlock(&usersLock);
   }
-  return NULL;
+  continue;
 }
 
 //communication thread. the pointer passed to it is the cThread flag, indicating if it's already running
@@ -822,7 +822,10 @@ void * communicationThread(void * param) {
     }
 
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
+      //acquire mutex for current users as well as disable cancelability
       pthread_mutex_lock(&usersLock);
+      pthread_setcancelstate(PTHREAD_CANCEL_DISABLE);
+
       if (FD_ISSET(iterator->socket, &clientList)) {
           //is this socket the one with input?
             char input[MAX_INPUT] = {0};
@@ -1038,6 +1041,7 @@ void * communicationThread(void * param) {
             }
           }
           pthread_mutex_unlock(&usersLock);
+          pthread_setcancelstate(PTHREAD_CANCEL_ENABLE);
         }
       }
   return NULL;
