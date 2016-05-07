@@ -789,7 +789,7 @@ void * handleClient(void * param) {
     pthread_mutex_unlock(&accountsLock);
     pthread_mutex_unlock(&usersLock);
   }
-  continue;
+  //continue;
 }
 
 //communication thread. the pointer passed to it is the cThread flag, indicating if it's already running
@@ -824,7 +824,7 @@ void * communicationThread(void * param) {
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
       //acquire mutex for current users as well as disable cancelability
       pthread_mutex_lock(&usersLock);
-      pthread_setcancelstate(PTHREAD_CANCEL_DISABLE);
+      pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 
       if (FD_ISSET(iterator->socket, &clientList)) {
           //is this socket the one with input?
@@ -1041,7 +1041,7 @@ void * communicationThread(void * param) {
             }
           }
           pthread_mutex_unlock(&usersLock);
-          pthread_setcancelstate(PTHREAD_CANCEL_ENABLE);
+          pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
         }
       }
   return NULL;
