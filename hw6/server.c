@@ -597,7 +597,7 @@ void * handleClient(void * param) {
           }
         }
         else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
-          
+
           if(checkAvailability(name)){}
           else{
             send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
@@ -793,10 +793,15 @@ void * handleClient(void * param) {
         //since checkAvailability already entered a record, all we need to do here is give the socket
         //the record checkAvailabilty entered is at the end of the list
         connected_user * temp = list_head;
-        while (temp->next != NULL) {
+        while (temp != NULL) {
+          if (strcmp(temp->username, name) == 0) {
+            temp->socket = client;
+            temp->loginTime = time(NULL);
+            break;
+          }
           temp = temp->next;
         }
-        temp->socket = client;
+
         //now add the user and his/her information to the list
         /*connected_user * currentlyConnected = malloc(sizeof(connected_user));
         memset(currentlyConnected, 0, sizeof(connected_user));
