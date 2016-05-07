@@ -544,6 +544,7 @@ void * handleClient(void * param) {
                         sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                         commandFlag = 1;
                       }
+                      continue;
                     }
                   }
                   //not correct protocol
@@ -553,6 +554,7 @@ void * handleClient(void * param) {
                       sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                       commandFlag = 1;
                     }
+                    continue;
                   }
                 }
               }
@@ -575,6 +577,7 @@ void * handleClient(void * param) {
                 commandFlag = 1;
               }
               close(client);
+              continue;
             }
           }
           //name already taken, send ERR 00
@@ -590,6 +593,7 @@ void * handleClient(void * param) {
               commandFlag = 1;
             }
             close(client);
+            continue;
           }
         }
         else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
