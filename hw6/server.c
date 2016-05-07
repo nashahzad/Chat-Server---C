@@ -333,13 +333,34 @@ int main(int argc, char *argv[]) {
 
 //check if a username is already taken. returns 0 if taken, 1 if not.
 int checkAvailability(char * toCheck) {
+  //acquire mutexes
+  pthread_mutex_lock(&usersLock);
   connected_user * iterator = list_head;
   while (iterator != NULL) {
     if (strcmp(iterator->username, toCheck) == 0) {
+      pthread_mutex_unlock(&usersLock);
       return 0;
     }
     iterator = iterator->next;
   }
+  //if username is available, preemptively create an active user record for them
+  connected_user * temp = malloc(sizeof(connected_user));
+  temp->username = malloc(strlen(toCheck) + 1);
+  strcpy(temp->username, toCheck);
+  temp->next = NULL;
+  if (list_head == NULL) {
+    temp->prev = NULL;
+    list_head = temp;
+  }
+  else {
+    iterator = list_head;
+    while(iterator->next != NULL) {
+      iterator = iterator->next;
+    }
+    temp->prev = iterator;
+    iterator->next = temp;
+  }
+  pthread_mutex_unlock(&usersLock);
   return 1;
 }
 
@@ -416,10 +437,6 @@ void * handleClient(void * param) {
       continue;
     }
 
-    //acquire mutexes
-    pthread_mutex_lock(&accountsLock);
-    pthread_mutex_lock(&usersLock);
-
     memset(input, 0, MAX_INPUT);
     recvData = recv(client, input, MAX_INPUT, 0);
     if (recvData > 0) {
@@ -437,6 +454,10 @@ void * handleClient(void * param) {
       if (checkEOM(input)) {
         int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
         if ((strcmp(check1, "IAM") == 0) && (checkWolfieProtocol == 2)) {
+
+          //acquire mutexes
+          //pthread_mutex_lock(&accountsLock);
+          //pthread_mutex_lock(&usersLock);
 
           //first check if the name is taken
           if (checkAvailability(name)) {
@@ -574,6 +595,7 @@ void * handleClient(void * param) {
         else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
           //does the name already exist?
           if (!(verifyUser(name, NULL))) {
+            checkAvailability(name);
 
             //send HINEW
             char hiResponse[200] = {0};
@@ -706,6 +728,9 @@ void * handleClient(void * param) {
       }
       //add to accounts list if applicable
       if (addNew) {
+        //acquire mutex
+        pthread_mutex_lock(&accountsLock);
+
         user_account * newAccount = malloc(sizeof(user_account));
         memset(newAccount, 0, sizeof(user_account));
         newAccount->username = malloc(strlen(name) + 1);
@@ -736,11 +761,23 @@ void * handleClient(void * param) {
           }
           iterator->next = newAccount;
         }
+
+        //release mutex
+        pthread_mutex_unlock(&accountsLock);
       }
       //add to client list if applicable
       if (addClient) {
+        //acquire mutex
+        pthread_mutex_lock(&usersLock);
+        //since checkAvailability already entered a record, all we need to do here is give the socket
+        //the record checkAvailabilty entered is at the end of the list
+        connected_user * temp = list_head;
+        while (temp->next != NULL) {
+          temp = temp->next;
+        }
+        temp->socket = client;
         //now add the user and his/her information to the list
-        connected_user * currentlyConnected = malloc(sizeof(connected_user));
+        /*connected_user * currentlyConnected = malloc(sizeof(connected_user));
         memset(currentlyConnected, 0, sizeof(connected_user));
         currentlyConnected->socket = client;
         currentlyConnected->username = malloc(strlen(name) + 1);
@@ -762,7 +799,7 @@ void * handleClient(void * param) {
           currentlyConnected->next = NULL;
           currentlyConnected->loginTime = time(NULL);
           iterator->next = currentlyConnected;
-        }
+        }*/
         //then run the communication thread
         if ((!cThread) && (list_head != NULL)) {
           pthread_create(&cid, NULL, communicationThread, &cThread);
@@ -770,13 +807,30 @@ void * handleClient(void * param) {
         //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
         else {
           int PID = fork();
-              if(PID == 0){
-                close(commPipe[0]);
-                write(commPipe[1], "a", 1);
-                close(commPipe[1]);
-                exit(EXIT_SUCCESS);
-              }
-              waitpid(PID, NULL, 0);
+          if (PID == 0) {
+            close(commPipe[0]);
+            write(commPipe[1], "a", 1);
+            close(commPipe[1]);
+            exit(EXIT_SUCCESS);
+          }
+          waitpid(PID, NULL, 0);
+        }
+        //release mutex
+        pthread_mutex_unlock(&usersLock);
+      }
+      //if failed, then that means authentication failed. need to remove the last record in the active users list
+      else {
+        connected_user * temp = list_head;
+        if ((temp->prev == NULL) && (temp->next == NULL)) {
+          list_head = NULL;
+          free(temp);
+        }
+        else {
+          while (temp->next != NULL) {
+            temp = temp->next;
+          }
+          temp->prev->next = NULL;
+          free(temp);
         }
       }
     }
@@ -790,8 +844,8 @@ void * handleClient(void * param) {
       //return NULL;
     //}
     //release mutexes
-    pthread_mutex_unlock(&accountsLock);
-    pthread_mutex_unlock(&usersLock);
+    //pthread_mutex_unlock(&accountsLock);
+    //pthread_mutex_unlock(&usersLock);
   }
   //continue;
 }
@@ -1136,20 +1190,24 @@ int parseMSG(char * input, char ** to, char ** from) {
 
 //looks for a user with name user. if its second arg is not null, it additionally verifies its password
 int verifyUser(char * user, unsigned char * pass) {
+  pthread_mutex_lock(&accountsLock);
   user_account * iterator = account_head;
   while (iterator != NULL) {
     if (strcmp(iterator->username, user) == 0) {
       if (pass != NULL) {
         if (memcmp(iterator->hash, pass, SHA256_DIGEST_LENGTH) == 0) {
+          pthread_mutex_unlock(&accountsLock);
           return 1;
         }
       }
       else {
+        pthread_mutex_unlock(&accountsLock);
         return 1;
       }
     }
     iterator = iterator->next;
   }
+  pthread_mutex_unlock(&accountsLock);
   return 0;
 }
 
