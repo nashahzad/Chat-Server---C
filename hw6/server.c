@@ -766,13 +766,17 @@ void * handleClient(void * param) {
         //then run the communication thread
         if ((!cThread) && (list_head != NULL)) {
           pthread_create(&cid, NULL, communicationThread, &cThread);
-          pthread_detach(cid);
         }
         //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
         else {
-          pthread_cancel(cid);
-          pthread_create(&cid, NULL, communicationThread, &cThread);
-          pthread_detach(cid);
+          int PID = fork();
+              if(PID == 0){
+                close(commPipe[0]);
+                write(commPipe[1], "a", 1);
+                close(commPipe[1]);
+                exit(EXIT_SUCCESS);
+              }
+              waitpid(PID, NULL, 0);
         }
       }
     }
@@ -800,6 +804,7 @@ void * communicationThread(void * param) {
   connected_user * iterator;
   fd_set clientList, zeroedList;
   FD_ZERO(&zeroedList);
+  FD_SET(commPipe[0], &zeroedList);
   //add the read end of the pipe to detect when to update fd's
   while (list_head != NULL) {
     iterator = list_head;
