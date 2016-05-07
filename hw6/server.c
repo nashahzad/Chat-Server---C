@@ -18,8 +18,16 @@ struct user_account {
 };
 typedef struct user_account user_account;
 
+struct next_request {
+  int socket;
+  struct next_request * next;
+};
+typedef struct next_request next_request;
+
 connected_user * list_head = NULL;
 user_account * account_head = NULL;
+next_request * queue_head = NULL;
+
 static char motd[MAX_INPUT] = {0};
 static int cThread = 0;
 static int verboseFlag = 0;
@@ -155,7 +163,18 @@ int main(int argc, char *argv[]) {
   if (pipe(commPipe)) {
    sfwrite(stdoutLock, stderr, "Pipe failed. Quitting...\n");
    exit(EXIT_FAILURE);
- }
+  }
+
+  //initialize the queue and semaphore
+  sem_init(&items_sem, 0, 0);
+
+  //now startup the login threads
+  int loginArrayCounter = 0;
+  loginArray = malloc(sizeof(pthread_t) * threadCount);
+  for(; loginArrayCounter < threadCount; loginArrayCounter++) {
+    pthread_create((loginArray + loginArrayCounter), NULL, handleClient, NULL);
+  }
+
   //run forever until receive /shutdown
   while(1) {
     if (commandFlag)
@@ -177,10 +196,32 @@ int main(int argc, char *argv[]) {
             sfwrite(stdoutLock, stderr, "Accept error. Code %d.\n", errcode);
           }
           else {
+            //create the next_request struct for this connector and add it to the queue
+            next_request * temp = malloc(sizeof(next_request));
+            temp->socket = clientSocket;
+            temp->next = NULL;
+
+            //first acquire mutex for the queue
+            pthread_mutex_lock(&queueLock);
+            //then insert into queue
+            if (queue_head == NULL) {
+              queue_head = temp;
+            }
+            else {
+              next_request * iterator = queue_head;
+              while(iterator->next != NULL) {
+                iterator = iterator->next;
+              }
+              iterator->next = temp;
+            }
+            //release mutex
+            pthread_mutex_unlock(&queueLock);
+            sem_post(&items_sem);
+
             //login thread
-            pthread_t tid;
-            pthread_create(&tid, NULL, handleClient, &clientSocket);
-            pthread_join(tid, NULL);
+            //pthread_t tid;
+            //pthread_create(&tid, NULL, handleClient, &clientSocket);
+            //pthread_join(tid, NULL);
           }
         }
         //is there something on stdin for the server?
@@ -192,13 +233,16 @@ int main(int argc, char *argv[]) {
             sfwrite(stdoutLock, stdout, "--------------------------------------\nCOMMAND LIST\n/accts          Prints list of user accounts\n/users          Prints list of current users\n/help           Prints this prompt\n/shutdown       Shuts down server\n--------------------------------------\n");
           }
           else if (strncmp("/users\n", test, 7) == 0) {
+            pthread_mutex_lock(&usersLock);
             connected_user * iterator = list_head;
             while (iterator != NULL) {
               sfwrite(stdoutLock, stdout, "%s\n", iterator->username);
               iterator = iterator->next;
             }
+            pthread_mutex_unlock(&usersLock);
           }
           else if (strncmp("/accts\n", test, 7) == 0) {
+            pthread_mutex_lock(&accountsLock);
             user_account * iterator = account_head;
             sfwrite(stdoutLock, stdout, "------------------------------------------------\nACCOUNTS\n");
             while (iterator != NULL) {
@@ -216,8 +260,13 @@ int main(int argc, char *argv[]) {
               iterator = iterator->next;
             }
             sfwrite(stdoutLock, stdout, "------------------------------------------------\n");
+            pthread_mutex_lock(&accountsLock);
           }
           else if (strncmp("/shutdown\n", test, 10) == 0) {
+            //acquire mutexes to ensure previous requests are complete
+            pthread_mutex_lock(&queueLock);
+            pthread_mutex_lock(&accountsLock);
+            pthread_mutex_lock(&usersLock);
             connected_user * iterator = list_head;
             while (iterator != NULL) {
               connected_user * temp = iterator;
@@ -254,7 +303,18 @@ int main(int argc, char *argv[]) {
               sfwrite(stdoutLock, stdout, "Sent to all users: BYE \r\n\r\n\n");
               commandFlag = 1;
             }
+            //free the login requests if any exist
+            next_request * iterator3 = queue_head;
+            while (iterator3 != NULL) {
+              next_request * temp = iterator3;
+              iterator3 = iterator3->next;
+              free(temp);
+            }
             close(serverSocket);
+            free(stdoutLock);
+            free(loginArray);
+            //quit_signal = 1;
+            //don't need to free mutexes since exiting anyway
             exit(EXIT_SUCCESS);
           }
           else {
@@ -304,315 +364,41 @@ int checkEOM(char * start) {
 
 //handle login
 void * handleClient(void * param) {
-  int client = *((int *) param);
-  //set up holding area for data
-  char input[MAX_INPUT] = {0};
-  int recvData;
-  int addClient = 0;
-  int addNew = 0;
-  recvData = recv(client, input, MAX_INPUT, 0);
+  while(1) {
 
-  //check if client started login protocol correctly
-  if (recvData > 0) {
-    if (verboseFlag) {
-      sfwrite(stdoutLock, stdout, "Received: %s\n", input);
-      commandFlag = 1;
-    }
-    if (strcmp(input, "WOLFIE \r\n\r\n") == 0) {
-      send(client, "EIFLOW \r\n\r\n", strlen("EIFLOW \r\n\r\n"), 0);
+    sem_wait(&items_sem);
+    //acquire mutex
+    pthread_mutex_lock(&queueLock);
+    //assume queue has something in it; semaphore takes care of the rest
+    next_request * tempQueueHead = queue_head;
+    //remove this request from the queue
+    queue_head = queue_head->next;
+    int client = tempQueueHead->socket;
+    //free the request since we took what we need (the socket)
+    free(tempQueueHead);
+    //release queue mutex
+    pthread_mutex_unlock(&queueLock);
+
+    //int client = *((int *) param);
+
+    //set up holding area for data
+    char input[MAX_INPUT] = {0};
+    int recvData;
+    int addClient = 0;
+    int addNew = 0;
+    recvData = recv(client, input, MAX_INPUT, 0);
+
+    //check if client started login protocol correctly
+    if (recvData > 0) {
       if (verboseFlag) {
-        sfwrite(stdoutLock, stdout, "Sent: EIFLOW \r\n\r\n\n");
+        sfwrite(stdoutLock, stdout, "Received: %s\n", input);
         commandFlag = 1;
       }
-    }
-    //incorrect protocol
-    else {
-      send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-      if (verboseFlag) {
-        sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-        commandFlag = 1;
-      }
-    }
-  }
-  //client closed unexpectedly
-  else {
-    close(client);
-    return NULL;
-  }
-
-  memset(input, 0, MAX_INPUT);
-  recvData = recv(client, input, MAX_INPUT, 0);
-  if (recvData > 0) {
-    if (verboseFlag) {
-      sfwrite(stdoutLock, stdout, "Received: %s\n", input);
-      commandFlag = 1;
-    }
-    char check1[10] = {0};
-    char check2[10] = {0};
-    char name[100] = {0};
-    char password[200] = {0};
-    char newPassword[200] = {0};
-
-    //check if the message has \r\n\r\n
-    if (checkEOM(input)) {
-      int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
-      if ((strcmp(check1, "IAM") == 0) && (checkWolfieProtocol == 2)) {
-
-        //first check if the name is taken
-        if (checkAvailability(name)) {
-          //then check if it exists in the user accounts list
-          if (verifyUser(name, NULL)) {
-            //if it does, then send AUTH
-            char authResponse[200] = {0};
-            strcpy(authResponse, "AUTH ");
-            strcat(authResponse, name);
-            strcat(authResponse, " \r\n\r\n");
-            send(client, authResponse, strlen(authResponse), 0);
-            if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent: %s\n", authResponse);
-              commandFlag = 1;
-            }
-
-            //memset the input to recv again, since we are expecting the password next
-            memset(input, 0, MAX_INPUT);
-            recvData = recv(client, input, MAX_INPUT, 0);
-            if (recvData > 0) {
-              if (verboseFlag) {
-                sfwrite(stdoutLock, stdout, "Received: %s\n", input);
-                commandFlag = 1;
-              }
-              if (checkEOM(input)) {
-                if (strncmp(input, "PASS ", 5) == 0) {
-                  //PASS <password> \r\n\r\n
-                  //012345 < strncpy from here, but ignore the space right before the \r\n\r\n
-                  strncpy(password, &input[5], strlen(input) - 5);
-                  unsigned char enteredPw[SHA256_DIGEST_LENGTH];
-                  SHA256_CTX context;
-                  SHA256_Init(&context);
-                  SHA256_Update(&context, (unsigned char *) password, strlen(password));
-                  user_account * iterator = account_head;
-                  while (iterator != NULL) {
-                    if (strcmp(iterator->username, name) == 0) {
-                      SHA256_Update(&context, iterator->salt, SALT_LENGTH);
-                      break;
-                    }
-                    iterator = iterator->next;
-                  }
-                  SHA256_Final(enteredPw, &context);
-                  if (verifyUser(name, enteredPw)) {
-                    //if pw is correct, send SSAP, HI, and MOTD
-                    send(client, "SSAP \r\n\r\n", strlen("SSAP \r\n\r\n"), 0);
-                    if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: SSAP \r\n\r\n\n");
-                      commandFlag = 1;
-                    }
-
-                    //HI
-                    char hiResponse[200] = {0};
-                    sprintf(hiResponse, "%s", "HI ");
-                    strcat(hiResponse, name);
-                    strcat(hiResponse, " \r\n\r\n");
-                    send(client, hiResponse, strlen(hiResponse), 0);
-                    if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: %s\n", hiResponse);
-                      commandFlag = 1;
-                    }
-
-                    //MOTD
-                    char sendMOTD[200] = {0};
-                    strcpy(sendMOTD, "MOTD ");
-                    strcat(sendMOTD, motd);
-                    strcat(sendMOTD, " \r\n\r\n");
-                    send(client, sendMOTD, strlen(sendMOTD), 0);
-                    if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: %s\n", sendMOTD);
-                      commandFlag = 1;
-                    }
-
-                    addClient = 1;
-                  }
-                  //incorrect password
-                  else {
-                    send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
-                    if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: ERR 02 BAD PASSWORD \r\n\r\n\n");
-                      commandFlag = 1;
-                    }
-                    send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-                    if (verboseFlag) {
-                      sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-                      commandFlag = 1;
-                    }
-                  }
-                }
-                //not correct protocol
-                else {
-                  send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-                  if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-                    commandFlag = 1;
-                  }
-                }
-              }
-            }
-            //client closed unexpectedly
-            else {
-              close(client);
-              return NULL;
-            }
-          }
-          //name doesn't exist in the list, send ERR 01
-          else {
-            send(client, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
-            if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent: ERR 01 USER NOT AVAILABLE \r\n\r\n\n");
-              commandFlag = 1;
-            }
-            send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-            if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-              commandFlag = 1;
-            }
-            close(client);
-          }
-        }
-        //name already taken, send ERR 00
-        else {
-          send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
-          if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
-            commandFlag = 1;
-          }
-          send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-          if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-            commandFlag = 1;
-          }
-          close(client);
-        }
-      }
-      else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
-        //does the name already exist?
-        if (!(verifyUser(name, NULL))) {
-
-          //send HINEW
-          char hiResponse[200] = {0};
-          sprintf(hiResponse, "%s", "HINEW ");
-          strcat(hiResponse, name);
-          strcat(hiResponse, " \r\n\r\n");
-          send(client, hiResponse, strlen(hiResponse), 0);
-          if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: %s\n", hiResponse);
-            commandFlag = 1;
-          }
-
-          //wait for NEWPASS
-          memset(input, 0, MAX_INPUT);
-          recvData = recv(client, input, MAX_INPUT, 0);
-          if (recvData > 0) {
-            if (verboseFlag) {
-              sfwrite(stdoutLock, stdout, "Received: %s\n", input);
-              commandFlag = 1;
-            }
-            if (checkEOM(input)) {
-              if (strncmp(input, "NEWPASS ", 8) == 0) {
-                strncpy(newPassword, &input[8], strlen(input) - 8);
-                if (verifyPass(newPassword)) {
-
-                  //send SSAPWEN
-                  char * ssapwenMessage = "SSAPWEN \r\n\r\n";
-                  send(client, ssapwenMessage, strlen(ssapwenMessage), 0);
-                  if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: %s\n", ssapwenMessage);
-                    commandFlag = 1;
-                  }
-
-                  //send HI
-                  char hiMessage[200] = {0};
-                  strcpy(hiMessage, "HI ");
-                  strcat(hiMessage, name);
-                  strcat(hiMessage, " \r\n\r\n");
-                  send(client, hiMessage, strlen(hiMessage), 0);
-                  if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: %s\n", hiMessage);
-                    commandFlag = 1;
-                  }
-
-                  //send MOTD
-                  char motdMessage[400] = {0};
-                  strcpy(motdMessage, "MOTD ");
-                  strcat(motdMessage, motd);
-                  strcat(motdMessage, " \r\n\r\n");
-                  send(client, motdMessage, strlen(motdMessage), 0);
-                  if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: %s\n", motdMessage);
-                    commandFlag = 1;
-                  }
-                  //finally set the addClient as wellas addNew (since new account) flag to 1
-                  addClient = 1;
-                  addNew = 1;
-                }
-                else {
-                  //bad password, send ERR 02
-                  send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
-                  if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: ERR 02 BAD PASSWORD \r\n\r\n\n");
-                    commandFlag = 1;
-                  }
-                  send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-                  if (verboseFlag) {
-                    sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-                    commandFlag = 1;
-                  }
-                  close(client);
-                }
-              }
-              //incorrect protocol
-              else {
-                send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-                if (verboseFlag) {
-                  sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-                  commandFlag = 1;
-                }
-              }
-            }
-            //incorrect protocol
-            else {
-              send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-              if (verboseFlag) {
-                sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-                commandFlag = 1;
-              }
-            }
-          }
-          //client closed unexpectedly
-          else {
-            int PID = fork();
-            if(PID == 0){
-              close(commPipe[0]);
-              write(commPipe[1], "a", 1);
-              close(commPipe[1]);
-              exit(EXIT_SUCCESS);
-            }
-            waitpid(PID, NULL, 0);
-            // pthread_cancel(cid);
-            // pthread_create(&cid, NULL, communicationThread, &cThread);
-            // pthread_detach(cid);
-          }
-        }
-        //if name already exists, then send ERR 00
-        else {
-          send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
-          if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
-            commandFlag = 1;
-          }
-          send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
-          if (verboseFlag) {
-            sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
-            commandFlag = 1;
-          }
-          close(client);
+      if (strcmp(input, "WOLFIE \r\n\r\n") == 0) {
+        send(client, "EIFLOW \r\n\r\n", strlen("EIFLOW \r\n\r\n"), 0);
+        if (verboseFlag) {
+          sfwrite(stdoutLock, stdout, "Sent: EIFLOW \r\n\r\n\n");
+          commandFlag = 1;
         }
       }
       //incorrect protocol
@@ -624,82 +410,384 @@ void * handleClient(void * param) {
         }
       }
     }
-    //add to accounts list if applicable
-    if (addNew) {
-      user_account * newAccount = malloc(sizeof(user_account));
-      memset(newAccount, 0, sizeof(user_account));
-      newAccount->username = malloc(strlen(name) + 1);
-      strcpy(newAccount->username, name);
-      newAccount->salt = malloc(SALT_LENGTH);
-      newAccount->hash = malloc(SHA256_DIGEST_LENGTH);
-      //generate the salt for the new user
-      unsigned char newSalt[SALT_LENGTH];
-      RAND_bytes(newSalt, SALT_LENGTH);
-      memcpy(newAccount->salt, newSalt, SALT_LENGTH);
-      //generate the hash for the new user
-      unsigned char newHash[SHA256_DIGEST_LENGTH];
-      SHA256_CTX context;
-      SHA256_Init(&context);
-      SHA256_Update(&context, (unsigned char * ) newPassword, strlen(newPassword));
-      SHA256_Update(&context, newSalt, SALT_LENGTH);
-      SHA256_Final(newHash, &context);
-      memcpy(newAccount->hash, newHash, SHA256_DIGEST_LENGTH);
+    //client closed unexpectedly
+    else {
+      close(client);
+      return NULL;
+    }
 
-      newAccount->next = NULL;
-      if (account_head == NULL) {
-        account_head = newAccount;
+    //acquire mutexes
+    pthread_mutex_lock(&accountsLock);
+    pthread_mutex_lock(&usersLock);
+
+    memset(input, 0, MAX_INPUT);
+    recvData = recv(client, input, MAX_INPUT, 0);
+    if (recvData > 0) {
+      if (verboseFlag) {
+        sfwrite(stdoutLock, stdout, "Received: %s\n", input);
+        commandFlag = 1;
       }
-      else {
-        user_account * iterator = account_head;
-        while (iterator->next != NULL) {
-          iterator = iterator->next;
+      char check1[10] = {0};
+      char check2[10] = {0};
+      char name[100] = {0};
+      char password[200] = {0};
+      char newPassword[200] = {0};
+
+      //check if the message has \r\n\r\n
+      if (checkEOM(input)) {
+        int checkWolfieProtocol = sscanf(input, "%s %s %s", check1, name, check2);
+        if ((strcmp(check1, "IAM") == 0) && (checkWolfieProtocol == 2)) {
+
+          //first check if the name is taken
+          if (checkAvailability(name)) {
+            //then check if it exists in the user accounts list
+            if (verifyUser(name, NULL)) {
+              //if it does, then send AUTH
+              char authResponse[200] = {0};
+              strcpy(authResponse, "AUTH ");
+              strcat(authResponse, name);
+              strcat(authResponse, " \r\n\r\n");
+              send(client, authResponse, strlen(authResponse), 0);
+              if (verboseFlag) {
+                sfwrite(stdoutLock, stdout, "Sent: %s\n", authResponse);
+                commandFlag = 1;
+              }
+
+              //memset the input to recv again, since we are expecting the password next
+              memset(input, 0, MAX_INPUT);
+              recvData = recv(client, input, MAX_INPUT, 0);
+              if (recvData > 0) {
+                if (verboseFlag) {
+                  sfwrite(stdoutLock, stdout, "Received: %s\n", input);
+                  commandFlag = 1;
+                }
+                if (checkEOM(input)) {
+                  if (strncmp(input, "PASS ", 5) == 0) {
+                    //PASS <password> \r\n\r\n
+                    //012345 < strncpy from here, but ignore the space right before the \r\n\r\n
+                    strncpy(password, &input[5], strlen(input) - 5);
+                    unsigned char enteredPw[SHA256_DIGEST_LENGTH];
+                    SHA256_CTX context;
+                    SHA256_Init(&context);
+                    SHA256_Update(&context, (unsigned char *) password, strlen(password));
+                    user_account * iterator = account_head;
+                    while (iterator != NULL) {
+                      if (strcmp(iterator->username, name) == 0) {
+                        SHA256_Update(&context, iterator->salt, SALT_LENGTH);
+                        break;
+                      }
+                      iterator = iterator->next;
+                    }
+                    SHA256_Final(enteredPw, &context);
+                    if (verifyUser(name, enteredPw)) {
+                      //if pw is correct, send SSAP, HI, and MOTD
+                      send(client, "SSAP \r\n\r\n", strlen("SSAP \r\n\r\n"), 0);
+                      if (verboseFlag) {
+                        sfwrite(stdoutLock, stdout, "Sent: SSAP \r\n\r\n\n");
+                        commandFlag = 1;
+                      }
+
+                      //HI
+                      char hiResponse[200] = {0};
+                      sprintf(hiResponse, "%s", "HI ");
+                      strcat(hiResponse, name);
+                      strcat(hiResponse, " \r\n\r\n");
+                      send(client, hiResponse, strlen(hiResponse), 0);
+                      if (verboseFlag) {
+                        sfwrite(stdoutLock, stdout, "Sent: %s\n", hiResponse);
+                        commandFlag = 1;
+                      }
+
+                      //MOTD
+                      char sendMOTD[200] = {0};
+                      strcpy(sendMOTD, "MOTD ");
+                      strcat(sendMOTD, motd);
+                      strcat(sendMOTD, " \r\n\r\n");
+                      send(client, sendMOTD, strlen(sendMOTD), 0);
+                      if (verboseFlag) {
+                        sfwrite(stdoutLock, stdout, "Sent: %s\n", sendMOTD);
+                        commandFlag = 1;
+                      }
+
+                      addClient = 1;
+                    }
+                    //incorrect password
+                    else {
+                      send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
+                      if (verboseFlag) {
+                        sfwrite(stdoutLock, stdout, "Sent: ERR 02 BAD PASSWORD \r\n\r\n\n");
+                        commandFlag = 1;
+                      }
+                      send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+                      if (verboseFlag) {
+                        sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+                        commandFlag = 1;
+                      }
+                    }
+                  }
+                  //not correct protocol
+                  else {
+                    send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+                    if (verboseFlag) {
+                      sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+                      commandFlag = 1;
+                    }
+                  }
+                }
+              }
+              //client closed unexpectedly
+              else {
+                close(client);
+                return NULL;
+              }
+            }
+            //name doesn't exist in the list, send ERR 01
+            else {
+              send(client, "ERR 01 USER NOT AVAILABLE \r\n\r\n", strlen("ERR 01 USER NOT AVAILABLE \r\n\r\n"), 0);
+              if (verboseFlag) {
+                sfwrite(stdoutLock, stdout, "Sent: ERR 01 USER NOT AVAILABLE \r\n\r\n\n");
+                commandFlag = 1;
+              }
+              send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+              if (verboseFlag) {
+                sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+                commandFlag = 1;
+              }
+              close(client);
+            }
+          }
+          //name already taken, send ERR 00
+          else {
+            send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
+              commandFlag = 1;
+            }
+            send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+              commandFlag = 1;
+            }
+            close(client);
+          }
         }
-        iterator->next = newAccount;
+        else if ((strcmp(check1, "IAMNEW") == 0) && (checkWolfieProtocol == 2)) {
+          //does the name already exist?
+          if (!(verifyUser(name, NULL))) {
+
+            //send HINEW
+            char hiResponse[200] = {0};
+            sprintf(hiResponse, "%s", "HINEW ");
+            strcat(hiResponse, name);
+            strcat(hiResponse, " \r\n\r\n");
+            send(client, hiResponse, strlen(hiResponse), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: %s\n", hiResponse);
+              commandFlag = 1;
+            }
+
+            //wait for NEWPASS
+            memset(input, 0, MAX_INPUT);
+            recvData = recv(client, input, MAX_INPUT, 0);
+            if (recvData > 0) {
+              if (verboseFlag) {
+                sfwrite(stdoutLock, stdout, "Received: %s\n", input);
+                commandFlag = 1;
+              }
+              if (checkEOM(input)) {
+                if (strncmp(input, "NEWPASS ", 8) == 0) {
+                  strncpy(newPassword, &input[8], strlen(input) - 8);
+                  if (verifyPass(newPassword)) {
+
+                    //send SSAPWEN
+                    char * ssapwenMessage = "SSAPWEN \r\n\r\n";
+                    send(client, ssapwenMessage, strlen(ssapwenMessage), 0);
+                    if (verboseFlag) {
+                      sfwrite(stdoutLock, stdout, "Sent: %s\n", ssapwenMessage);
+                      commandFlag = 1;
+                    }
+
+                    //send HI
+                    char hiMessage[200] = {0};
+                    strcpy(hiMessage, "HI ");
+                    strcat(hiMessage, name);
+                    strcat(hiMessage, " \r\n\r\n");
+                    send(client, hiMessage, strlen(hiMessage), 0);
+                    if (verboseFlag) {
+                      sfwrite(stdoutLock, stdout, "Sent: %s\n", hiMessage);
+                      commandFlag = 1;
+                    }
+
+                    //send MOTD
+                    char motdMessage[400] = {0};
+                    strcpy(motdMessage, "MOTD ");
+                    strcat(motdMessage, motd);
+                    strcat(motdMessage, " \r\n\r\n");
+                    send(client, motdMessage, strlen(motdMessage), 0);
+                    if (verboseFlag) {
+                      sfwrite(stdoutLock, stdout, "Sent: %s\n", motdMessage);
+                      commandFlag = 1;
+                    }
+                    //finally set the addClient as wellas addNew (since new account) flag to 1
+                    addClient = 1;
+                    addNew = 1;
+                  }
+                  else {
+                    //bad password, send ERR 02
+                    send(client, "ERR 02 BAD PASSWORD \r\n\r\n", strlen("ERR 02 BAD PASSWORD \r\n\r\n"), 0);
+                    if (verboseFlag) {
+                      sfwrite(stdoutLock, stdout, "Sent: ERR 02 BAD PASSWORD \r\n\r\n\n");
+                      commandFlag = 1;
+                    }
+                    send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+                    if (verboseFlag) {
+                      sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+                      commandFlag = 1;
+                    }
+                    close(client);
+                  }
+                }
+                //incorrect protocol
+                else {
+                  send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+                  if (verboseFlag) {
+                    sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+                    commandFlag = 1;
+                  }
+                }
+              }
+              //incorrect protocol
+              else {
+                send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+                if (verboseFlag) {
+                  sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+                  commandFlag = 1;
+                }
+              }
+            }
+            //client closed unexpectedly
+            else {
+              int PID = fork();
+              if(PID == 0){
+                close(commPipe[0]);
+                write(commPipe[1], "a", 1);
+                close(commPipe[1]);
+                exit(EXIT_SUCCESS);
+              }
+              waitpid(PID, NULL, 0);
+              // pthread_cancel(cid);
+              // pthread_create(&cid, NULL, communicationThread, &cThread);
+              // pthread_detach(cid);
+            }
+          }
+          //if name already exists, then send ERR 00
+          else {
+            send(client, "ERR 00 USER NAME TAKEN \r\n\r\n", strlen("ERR 00 USER NAME TAKEN \r\n\r\n"), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: ERR 00 USER NAME TAKEN \r\n\r\n\n");
+              commandFlag = 1;
+            }
+            send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+            if (verboseFlag) {
+              sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+              commandFlag = 1;
+            }
+            close(client);
+          }
+        }
+        //incorrect protocol
+        else {
+          send(client, "BYE \r\n\r\n", strlen("BYE \r\n\r\n"), 0);
+          if (verboseFlag) {
+            sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
+            commandFlag = 1;
+          }
+        }
+      }
+      //add to accounts list if applicable
+      if (addNew) {
+        user_account * newAccount = malloc(sizeof(user_account));
+        memset(newAccount, 0, sizeof(user_account));
+        newAccount->username = malloc(strlen(name) + 1);
+        strcpy(newAccount->username, name);
+        newAccount->salt = malloc(SALT_LENGTH);
+        newAccount->hash = malloc(SHA256_DIGEST_LENGTH);
+        //generate the salt for the new user
+        unsigned char newSalt[SALT_LENGTH];
+        RAND_bytes(newSalt, SALT_LENGTH);
+        memcpy(newAccount->salt, newSalt, SALT_LENGTH);
+        //generate the hash for the new user
+        unsigned char newHash[SHA256_DIGEST_LENGTH];
+        SHA256_CTX context;
+        SHA256_Init(&context);
+        SHA256_Update(&context, (unsigned char * ) newPassword, strlen(newPassword));
+        SHA256_Update(&context, newSalt, SALT_LENGTH);
+        SHA256_Final(newHash, &context);
+        memcpy(newAccount->hash, newHash, SHA256_DIGEST_LENGTH);
+
+        newAccount->next = NULL;
+        if (account_head == NULL) {
+          account_head = newAccount;
+        }
+        else {
+          user_account * iterator = account_head;
+          while (iterator->next != NULL) {
+            iterator = iterator->next;
+          }
+          iterator->next = newAccount;
+        }
+      }
+      //add to client list if applicable
+      if (addClient) {
+        //now add the user and his/her information to the list
+        connected_user * currentlyConnected = malloc(sizeof(connected_user));
+        memset(currentlyConnected, 0, sizeof(connected_user));
+        currentlyConnected->socket = client;
+        currentlyConnected->username = malloc(strlen(name) + 1);
+        strcpy(currentlyConnected->username, name);
+        //is the list empty?
+        if (list_head == NULL) {
+          currentlyConnected->prev = NULL;
+          currentlyConnected->next = NULL;
+          currentlyConnected->loginTime = time(NULL);
+          list_head = currentlyConnected;
+        }
+        //otherwise go to end and add it there
+        else {
+          connected_user * iterator = list_head;
+          while(iterator->next != NULL) {
+            iterator = iterator->next;
+          }
+          currentlyConnected->prev = iterator;
+          currentlyConnected->next = NULL;
+          currentlyConnected->loginTime = time(NULL);
+          iterator->next = currentlyConnected;
+        }
+        //then run the communication thread
+        if ((!cThread) && (list_head != NULL)) {
+          pthread_create(&cid, NULL, communicationThread, &cThread);
+          pthread_detach(cid);
+        }
+        //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
+        else {
+          pthread_cancel(cid);
+          pthread_create(&cid, NULL, communicationThread, &cThread);
+          pthread_detach(cid);
+        }
       }
     }
-    //add to client list if applicable
-    if (addClient) {
-      //now add the user and his/her information to the list
-      connected_user * currentlyConnected = malloc(sizeof(connected_user));
-      memset(currentlyConnected, 0, sizeof(connected_user));
-      currentlyConnected->socket = client;
-      currentlyConnected->username = malloc(strlen(name) + 1);
-      strcpy(currentlyConnected->username, name);
-      //is the list empty?
-      if (list_head == NULL) {
-        currentlyConnected->prev = NULL;
-        currentlyConnected->next = NULL;
-        currentlyConnected->loginTime = time(NULL);
-        list_head = currentlyConnected;
-      }
-      //otherwise go to end and add it there
-      else {
-        connected_user * iterator = list_head;
-        while(iterator->next != NULL) {
-          iterator = iterator->next;
-        }
-        currentlyConnected->prev = iterator;
-        currentlyConnected->next = NULL;
-        currentlyConnected->loginTime = time(NULL);
-        iterator->next = currentlyConnected;
-      }
-      //then run the communication thread
-      if ((!cThread) && (list_head != NULL)) {
-        pthread_create(&cid, NULL, communicationThread, &cThread);
-        pthread_detach(cid);
-      }
-      //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
-      else {
-        pthread_cancel(cid);
-        pthread_create(&cid, NULL, communicationThread, &cThread);
-        pthread_detach(cid);
-      }
+    //client closed unexpectedly
+    else {
+      close(client);
     }
-  }
-  //client closed unexpectedly
-  else {
-    close(client);
-    return NULL;
+    //if (quit_signal) {
+//      pthread_mutex_unlock(&accountsLock);
+      //pthread_mutex_unlock(&usersLock);
+      //return NULL;
+    //}
+    //release mutexes
+    pthread_mutex_unlock(&accountsLock);
+    pthread_mutex_unlock(&usersLock);
   }
   return NULL;
 }
@@ -734,6 +822,7 @@ void * communicationThread(void * param) {
     }
 
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
+      pthread_mutex_lock(&usersLock);
       if (FD_ISSET(iterator->socket, &clientList)) {
           //is this socket the one with input?
             char input[MAX_INPUT] = {0};
@@ -948,6 +1037,7 @@ void * communicationThread(void * param) {
               free(storeName);
             }
           }
+          pthread_mutex_unlock(&usersLock);
         }
       }
   return NULL;
@@ -1155,6 +1245,9 @@ int readRecord(FILE * file, char ** username, unsigned char ** salt, unsigned ch
 }
 
 void handleSigInt(int sig) {
+  pthread_mutex_lock(&queueLock);
+  pthread_mutex_lock(&accountsLock);
+  pthread_mutex_lock(&usersLock);
   char * caughtSigInt = "\nCaught SIGINT. Quitting...\n";
   sfwrite(stdoutLock, stdout, caughtSigInt);
   //ctrl c should function similarly to /shutdown with some additions
@@ -1191,6 +1284,13 @@ void handleSigInt(int sig) {
     free(temp->hash);
     free(temp);
   }
+  //free the login requests if any exist
+  next_request * iterator3 = queue_head;
+  while (iterator3 != NULL) {
+    next_request * temp = iterator3;
+    iterator3 = iterator3->next;
+    free(temp);
+  }
   fclose(writeToFile);
   if (verboseFlag) {
     sfwrite(stdoutLock, stdout, "Sent to all users: BYE \r\n\r\n\n");
@@ -1199,5 +1299,8 @@ void handleSigInt(int sig) {
   close(serverSocket);
   //finally, need to kill the communication thread if it exists
   pthread_cancel(cid);
+  free(stdoutLock);
+  free(loginArray);
+  //quit_signal = 1;
   exit(EXIT_SUCCESS);
 }

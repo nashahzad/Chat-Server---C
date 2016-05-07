@@ -18,6 +18,7 @@
 #include <netinet/in.h>
 #include <openssl/sha.h>
 #include <openssl/rand.h>
+#include <semaphore.h>
 
 //#include <pthread.h>
 #include <time.h>
@@ -42,5 +43,11 @@ int args;
 char ** args2;
 int threadCount = 2;
 pthread_mutex_t *stdoutLock;
+pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t accountsLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t usersLock = PTHREAD_MUTEX_INITIALIZER;
+sem_t items_sem;
+int quit_signal = 0;
+pthread_t * loginArray;
 
 #endif
