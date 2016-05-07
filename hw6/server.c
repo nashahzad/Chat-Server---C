@@ -843,6 +843,14 @@ void * handleClient(void * param) {
         }
         //release mutex
         pthread_mutex_unlock(&usersLock);
+        int PID = fork();
+          if (PID == 0) {
+            close(commPipe[0]);
+            write(commPipe[1], "a", 1);
+            close(commPipe[1]);
+            exit(EXIT_SUCCESS);
+          }
+          waitpid(PID, NULL, 0);
       }
       //if failed, then that means authentication failed. need to remove the last record in the active users list
       else {
@@ -887,6 +895,7 @@ void * communicationThread(void * param) {
   FD_SET(commPipe[0], &zeroedList);
   //add the read end of the pipe to detect when to update fd's
   while (list_head != NULL) {
+    pthread_mutex_lock(&usersLock);
     iterator = list_head;
     clientList = zeroedList;
     //FD_SET(commPipe[0], &clientList);
@@ -894,6 +903,7 @@ void * communicationThread(void * param) {
       FD_SET(iterator->socket, &clientList);
       iterator = iterator->next;
     }
+    pthread_mutex_unlock(&usersLock);
     if (select(FD_SETSIZE, &clientList, NULL, NULL, NULL) == -1) {
       sfwrite(stdoutLock, stdout, "Select failed.\n");
       exit(EXIT_FAILURE);
