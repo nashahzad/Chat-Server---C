@@ -822,11 +822,11 @@ void * communicationThread(void * param) {
     }
 
     for(iterator = list_head; iterator != NULL; iterator = iterator->next) {
-      //acquire mutex for current users as well as disable cancelability
-      pthread_mutex_lock(&usersLock);
-      pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 
       if (FD_ISSET(iterator->socket, &clientList)) {
+        //acquire mutex for current users as well as disable cancelability
+        pthread_mutex_lock(&usersLock);
+        pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
           //is this socket the one with input?
             char input[MAX_INPUT] = {0};
             //since already connected, just listen for communication
@@ -850,9 +850,6 @@ void * communicationThread(void * param) {
                     close(iterator->socket);
                     storeName = iterator->username;
                     free(iterator);
-                    *((int *) param) = 0;
-                    //if there's no user, then end the thread
-                    return NULL;
                   }
                   //if at beginning
                   if (iterator->prev == NULL) {
@@ -1002,11 +999,8 @@ void * communicationThread(void * param) {
                 close(iterator->socket);
                 storeName = iterator->username;
                 free(iterator);
-                *((int *) param) = 0;
-                //if there's no user, then end the thread
-                return NULL;
               }
-              if (iterator->prev == NULL) {
+              else if (iterator->prev == NULL) {
                 iterator->next->prev = NULL;
                 list_head = iterator->next;
                 close(iterator->socket);
@@ -1039,9 +1033,14 @@ void * communicationThread(void * param) {
               }
               free(storeName);
             }
+            pthread_mutex_unlock(&usersLock);
+            pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+            if (list_head == NULL) {
+              *((int *) param) = 0;
+              //if there's no user, then end the thread
+              return NULL;
+            }
           }
-          pthread_mutex_unlock(&usersLock);
-          pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
         }
       }
   return NULL;
