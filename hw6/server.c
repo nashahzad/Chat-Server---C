@@ -558,6 +558,36 @@ void * handleClient(void * param) {
                       sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                       commandFlag = 1;
                     }
+                    close(client);
+                    pthread_mutex_lock(&usersLock);
+                    connected_user * iterator = list_head;
+                    while(iterator != NULL) {
+                      if (strcmp(iterator->username, name) == 0) {
+                        if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                          list_head = NULL;
+                          free(iterator);
+                          break;
+                        }
+                        else if (iterator->prev == NULL) {
+                          list_head = iterator->next;
+                          free(iterator);
+                          break;
+                        }
+                        else if (iterator->next == NULL) {
+                          iterator->prev->next = NULL;
+                          free(iterator);
+                          break;
+                        }
+                        else {
+                          iterator->prev->next = iterator->next;
+                          iterator->next->prev = iterator->prev;
+                          free(iterator);
+                          break;
+                        }
+                      }
+                      iterator = iterator->next;
+                    }
+                    pthread_mutex_unlock(&usersLock);
                     continue;
                   }
                 }
@@ -565,6 +595,35 @@ void * handleClient(void * param) {
               //client closed unexpectedly
               else {
                 close(client);
+                pthread_mutex_lock(&usersLock);
+                connected_user * iterator = list_head;
+                while(iterator != NULL) {
+                  if (strcmp(iterator->username, name) == 0) {
+                    if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                      list_head = NULL;
+                      free(iterator);
+                      break;
+                    }
+                    else if (iterator->prev == NULL) {
+                      list_head = iterator->next;
+                      free(iterator);
+                      break;
+                    }
+                    else if (iterator->next == NULL) {
+                      iterator->prev->next = NULL;
+                      free(iterator);
+                      break;
+                    }
+                    else {
+                      iterator->prev->next = iterator->next;
+                      iterator->next->prev = iterator->prev;
+                      free(iterator);
+                      break;
+                    }
+                  }
+                  iterator = iterator->next;
+                }
+                pthread_mutex_unlock(&usersLock);
                 continue;
               }
             }
@@ -701,6 +760,36 @@ void * handleClient(void * param) {
                     sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                     commandFlag = 1;
                   }
+                  close(client);
+                  pthread_mutex_lock(&usersLock);
+                  connected_user * iterator = list_head;
+                  while(iterator != NULL) {
+                    if (strcmp(iterator->username, name) == 0) {
+                      if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                        list_head = NULL;
+                        free(iterator);
+                        break;
+                      }
+                      else if (iterator->prev == NULL) {
+                        list_head = iterator->next;
+                        free(iterator);
+                        break;
+                      }
+                      else if (iterator->next == NULL) {
+                        iterator->prev->next = NULL;
+                        free(iterator);
+                        break;
+                      }
+                      else {
+                        iterator->prev->next = iterator->next;
+                        iterator->next->prev = iterator->prev;
+                        free(iterator);
+                        break;
+                      }
+                    }
+                    iterator = iterator->next;
+                  }
+                  pthread_mutex_unlock(&usersLock);
                 }
               }
               //incorrect protocol
@@ -710,6 +799,36 @@ void * handleClient(void * param) {
                   sfwrite(stdoutLock, stdout, "Sent: BYE \r\n\r\n\n");
                   commandFlag = 1;
                 }
+                close(client);
+                pthread_mutex_lock(&usersLock);
+                connected_user * iterator = list_head;
+                while(iterator != NULL) {
+                  if (strcmp(iterator->username, name) == 0) {
+                    if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                      list_head = NULL;
+                      free(iterator);
+                      break;
+                    }
+                    else if (iterator->prev == NULL) {
+                      list_head = iterator->next;
+                      free(iterator);
+                      break;
+                    }
+                    else if (iterator->next == NULL) {
+                      iterator->prev->next = NULL;
+                      free(iterator);
+                      break;
+                    }
+                    else {
+                      iterator->prev->next = iterator->next;
+                      iterator->next->prev = iterator->prev;
+                      free(iterator);
+                      break;
+                    }
+                  }
+                  iterator = iterator->next;
+                }
+                pthread_mutex_unlock(&usersLock);
               }
             }
             //client closed unexpectedly
@@ -725,6 +844,35 @@ void * handleClient(void * param) {
               // pthread_cancel(cid);
               // pthread_create(&cid, NULL, communicationThread, &cThread);
               // pthread_detach(cid);
+              pthread_mutex_lock(&usersLock);
+              connected_user * iterator = list_head;
+              while(iterator != NULL) {
+                if (strcmp(iterator->username, name) == 0) {
+                  if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                    list_head = NULL;
+                    free(iterator);
+                    break;
+                  }
+                  else if (iterator->prev == NULL) {
+                    list_head = iterator->next;
+                    free(iterator);
+                    break;
+                  }
+                  else if (iterator->next == NULL) {
+                    iterator->prev->next = NULL;
+                    free(iterator);
+                    break;
+                  }
+                  else {
+                    iterator->prev->next = iterator->next;
+                    iterator->next->prev = iterator->prev;
+                    free(iterator);
+                    break;
+                  }
+                }
+                iterator = iterator->next;
+              }
+              pthread_mutex_unlock(&usersLock);
             }
           }
           //if name already exists, then send ERR 00
@@ -858,17 +1006,36 @@ void * handleClient(void * param) {
       }
       //if failed, then that means authentication failed. need to remove the last record in the active users list
       else {
-        connected_user * temp = list_head;
-        if ((temp->prev == NULL) && (temp->next == NULL)) {
-          list_head = NULL;
-          free(temp);
-        }
-        else {
-          while (temp->next != NULL) {
-            temp = temp->next;
+        if (list_head != NULL) {
+          pthread_mutex_lock(&usersLock);
+          connected_user * iterator = list_head;
+          while(iterator != NULL) {
+            if (strcmp(iterator->username, name) == 0) {
+              if ((iterator->prev == NULL) && (iterator->next == NULL)) {
+                list_head = NULL;
+                free(iterator);
+                break;
+              }
+              else if (iterator->prev == NULL) {
+                list_head = iterator->next;
+                free(iterator);
+                break;
+              }
+              else if (iterator->next == NULL) {
+                iterator->prev->next = NULL;
+                free(iterator);
+                break;
+              }
+              else {
+                iterator->prev->next = iterator->next;
+                iterator->next->prev = iterator->prev;
+                free(iterator);
+                break;
+              }
+            }
+            iterator = iterator->next;
           }
-          temp->prev->next = NULL;
-          free(temp);
+          pthread_mutex_unlock(&usersLock);
         }
       }
     }
