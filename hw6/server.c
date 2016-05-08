@@ -312,6 +312,10 @@ int main(int argc, char *argv[]) {
             }
             close(serverSocket);
             free(stdoutLock);
+            for(loginArrayCounter = 0; loginArrayCounter < threadCount; loginArrayCounter++) {
+              pthread_cancel((loginArray[loginArrayCounter]));
+            }
+            pthread_cancel(cid);
             free(loginArray);
             //quit_signal = 1;
             //don't need to free mutexes since exiting anyway
@@ -1406,9 +1410,13 @@ void handleSigInt(int sig) {
   }
   close(serverSocket);
   //finally, need to kill the communication thread if it exists
-  pthread_cancel(cid);
   free(stdoutLock);
-  free(loginArray);
   //quit_signal = 1;
+  int loginArrayCounter = 0;
+  for(; loginArrayCounter < threadCount; loginArrayCounter++) {
+    pthread_cancel(*(loginArray + loginArrayCounter));
+  }
+  pthread_cancel(cid);
+  free(loginArray);
   exit(EXIT_SUCCESS);
 }
