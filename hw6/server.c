@@ -920,7 +920,7 @@ void * communicationThread(void * param) {
 
       if (FD_ISSET(iterator->socket, &clientList)) {
         //acquire mutex for current users as well as disable cancelability
-        pthread_mutex_lock(&usersLock);
+        //pthread_mutex_lock(&usersLock);
         pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
           //is this socket the one with input?
             char input[MAX_INPUT] = {0};
@@ -1132,8 +1132,9 @@ void * communicationThread(void * param) {
                 commandFlag = 1;
               }
               free(storeName);
+              pthread_mutex_unlock(&usersLock);
             }
-            pthread_mutex_unlock(&usersLock);
+            //pthread_mutex_unlock(&usersLock);
             pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
             if (list_head == NULL) {
               *((int *) param) = 0;
