@@ -48,6 +48,7 @@ chat *head = NULL;
 #define USAGE "./client [-hcv] [-a FILE] NAME SERVER_IP SERVER_PORT\n-a FILE		Path to audit log file\n-h              Displays this help menu, and returns EXIT_SUCCESS.\n-c              Requests to server to create a new user.\n-v              Verbose print all traffic.\nNAME            Username to display\nSERVER_IP       IP to connect to\nSERVER_PORT     Port to connect to.\n"
 
 #define HELP "\nHELP MENU\n" \
+"/audit - Will dump contents of <audit_file> into terminal.\n"\
 "/time - Will ask the server for how long you have been connected.\n"\
 "/help - Will pop open help menu of of commands that you are reading right now :D\n"\
 "/logout - Will disconnect with the server.\n"\
