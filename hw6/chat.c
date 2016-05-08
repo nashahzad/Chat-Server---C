@@ -33,7 +33,7 @@ int main(int argc, char *argv[]){
 			fgets(buffer, MAX_INPUT, stdin);
 
 			//IF JUST NEW LINE AND NOTHING WRITTEN DOWN THEN JUST DO NOTHING
-			if(buffer[0] == '\n'){
+			if(buffer[0] == '\n' || strlen(buffer) == 0){
 				write(0, "\033[1A", 4);
 				continue;
 			}
@@ -54,6 +54,9 @@ int main(int argc, char *argv[]){
 			}
 
 			else{
+				char *t = timestamp();
+				sfwrite(lock, audit, "%s, %s, MSG, success, from %s in chat, %s", t, argv[3], argv[3], buffer);
+			    free(t);	
 				send(fd, buffer, strlen(buffer), 0);
 			}
 		}
@@ -66,8 +69,12 @@ int main(int argc, char *argv[]){
 				FD_ZERO(&set);
 				FD_SET(fd, &set);
 				fprintf(stdout, "%sReceive %s: User had logged off or disconnect.%s\n", RED, buffer, NORMAL);
+				char *t = timestamp();
+				sfwrite(lock, audit, "%s, %s, /close, other client closed, chat\n", t, argv[3]);
+			    free(t);	
 				read(0, buffer, 1);
 				free(lock);
+				fclose(audit);
 				exit(EXIT_SUCCESS);
 			}
 
