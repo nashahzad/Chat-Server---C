@@ -6,6 +6,7 @@
 #include "sfwrite.h"
 //#include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -42,6 +43,7 @@ int serverSocket;
 int args;
 char ** args2;
 int threadCount = 2;
+bool commThreadCount = false;
 pthread_mutex_t *stdoutLock;
 pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t accountsLock = PTHREAD_MUTEX_INITIALIZER;

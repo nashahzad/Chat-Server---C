@@ -979,8 +979,9 @@ void * handleClient(void * param) {
           iterator->next = currentlyConnected;
         }*/
         //then run the communication thread
-        if ((!cThread) && (list_head != NULL)) {
+        if ((!commThreadCount) && (list_head != NULL)) {
           pthread_create(&cid, NULL, communicationThread, &cThread);
+          commThreadCount = true;
         }
         //if it already exists, need to write to the pipe so the communication thread knows to update accordingly
         else {
