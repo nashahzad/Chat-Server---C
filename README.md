@@ -1,2 +1,5 @@
-- Nauman Shahzad 109813732  
-- Raymond Lam 109834504 
+Group: RagingMangoes
+- Nauman Shahzad   
+- Raymond Lam 
+
+Made and tested on Ubuntu 15.10

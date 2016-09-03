@@ -1,0 +1,65 @@
+05-13-16- 7:13PM, Daniel, LOGIN, 127.0.0.1:1812, success, MOTD Good afternoon 
+05-13-16- 7:13PM, Nadia, LOGIN, 127.0.0.1:1812, success, MOTD Good afternoon 
+05-13-16- 7:13PM, Nadia, MS, from, Nadia, well hello there 
+05-13-16- 7:13PM, Daniel, CMD, /chat Nadia well hello there, success, client
+05-13-16- 7:13PM, Daniel, MS, from, Daniel, well hello there 
+05-13-16- 7:13PM, Nadia, MSG, success, from Nadia in chat, hi
+05-13-16- 7:13PM, Daniel, MS, from, Daniel, hi 
+05-13-16- 7:13PM, Nadia, MS, from, Nadia, hi 
+05-13-16- 7:13PM, Nadia, MSG, success, from Nadia in chat, u smell
+05-13-16- 7:13PM, Daniel, MS, from, Daniel, u smell 
+05-13-16- 7:13PM, Nadia, MS, from, Nadia, u smell 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, ;laskjdf
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, ;laskjdf 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, ;laskjdf 
+05-13-16- 7:14PM, Daniel, MSG, success, from Daniel in chat, sdlfkjs
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, sdlfkjs 
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, sdlfkjs 
+05-13-16- 7:14PM, Daniel, MSG, success, from Daniel in chat, lksjd
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, lksjd 
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, lksjd 
+05-13-16- 7:14PM, Daniel, MSG, success, from Daniel in chat, lks
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, lks 
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, lks 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, lskjdf
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, lskjdf 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, lskjdf 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, lksj
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, lksj 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, lksj 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, lkjlkd
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, lkjlkd 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, lkjlkd 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, dkjfsd
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, dkjfsd 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, dkjfsd 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, fasdf
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, fasdf 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, fasdf 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, kjas
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, kjas 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, kjas 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, flsflskjfsdlkfjsd
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, flsflskjfsdlkfjsd 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, flsflskjfsdlkfjsd 
+05-13-16- 7:14PM, Nadia, MSG, success, from Nadia in chat, sdk
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, sdk 
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, sdk 
+05-13-16- 7:14PM, Nadia, /close, success, chat
+05-13-16- 7:14PM, Daniel, MSG, success, from Daniel in chat, lkjd
+05-13-16- 7:14PM, Nadia, MS, from, Nadia, lkjd 
+05-13-16- 7:14PM, Daniel, MS, from, Daniel, lkjd 
+05-13-16- 7:15PM, Nadia, /close, success, chat
+05-13-16- 7:15PM, Daniel, MSG, success, from Daniel in chat, lkdj
+05-13-16- 7:15PM, Nadia, MS, from, Nadia, lkdj 
+05-13-16- 7:15PM, Daniel, MS, from, Daniel, lkdj 
+05-13-16- 7:15PM, Nadia, /close, success, chat
+05-13-16- 7:15PM, Daniel, MSG, success, from Daniel in chat, lksj
+05-13-16- 7:15PM, Nadia, MS, from, Nadia, lksj 
+05-13-16- 7:15PM, Daniel, MS, from, Daniel, lksj 
+05-13-16- 7:15PM, Nadia, /close, success, chat
+05-13-16- 7:15PM, Daniel, /close, success, chat
+05-13-16- 7:15PM, Daniel, CMD, /time, success, client
+05-13-16- 7:15PM, Daniel, CMD, /listu, success, client
+05-13-16- 7:15PM, Nadia, CMD, /listu, success, client
+05-13-16- 7:15PM, Nadia, CMD, /audit, success, client

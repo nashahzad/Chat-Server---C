@@ -1,0 +1,10 @@
+05-12-16-10:50AM, Tony, LOGIN, 127.0.0.1:1812, success, MOTD hello 
+05-12-16-10:50AM, Tony, CMD, /audit, success, client
+05-12-16-10:50AM, Tony, LOGOUT, intentional
+05-12-16-10:54AM, Tony, LOGIN, 127.0.0.1:1812, success, MOTD hello 
+05-12-16-10:54AM, Tony, CMD, /time, success, client
+05-12-16-10:54AM, Tony, CMD, /listu, success, client
+05-12-16-10:54AM, Tony, CMD, /audit, success, client
+05-12-16-10:54AM, Tony, LOGOUT, CTRL-C
+05-12-16-10:54AM, Tony, LOGIN, 127.0.0.1:1812, success, MOTD hello 
+05-12-16-10:54AM, Tony, CMD, /audit, success, client

@@ -1,7 +1,0 @@
-*.out
-*.o
-*.a
-*~
-server
-client
-chat
